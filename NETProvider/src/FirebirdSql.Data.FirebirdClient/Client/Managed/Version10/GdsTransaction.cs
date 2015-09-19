@@ -137,10 +137,10 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 					GenericResponse response;
 					lock (_database.SyncObject)
 					{
-						_database.Write(IscCodes.op_transaction);
-						_database.Write(_database.Handle);
-						_database.WriteBuffer(tpb.ToArray());
-						_database.Flush();
+						_database.XdrStream.Write(IscCodes.op_transaction);
+						_database.XdrStream.Write(_database.Handle);
+						_database.XdrStream.WriteBuffer(tpb.ToArray());
+						_database.XdrStream.Flush();
 
 						response = _database.ReadGenericResponse();
 
@@ -167,9 +167,9 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 				{
 					lock (_database.SyncObject)
 					{
-						_database.Write(IscCodes.op_commit);
-						_database.Write(_handle);
-						_database.Flush();
+						_database.XdrStream.Write(IscCodes.op_commit);
+						_database.XdrStream.Write(_handle);
+						_database.XdrStream.Flush();
 
 						_database.ReadResponse();
 
@@ -200,9 +200,9 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 				{
 					lock (_database.SyncObject)
 					{
-						_database.Write(IscCodes.op_rollback);
-						_database.Write(_handle);
-						_database.Flush();
+						_database.XdrStream.Write(IscCodes.op_rollback);
+						_database.XdrStream.Write(_handle);
+						_database.XdrStream.Flush();
 
 						_database.ReadResponse();
 
@@ -233,9 +233,9 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 				{
 					lock (_database.SyncObject)
 					{
-						_database.Write(IscCodes.op_commit_retaining);
-						_database.Write(_handle);
-						_database.Flush();
+						_database.XdrStream.Write(IscCodes.op_commit_retaining);
+						_database.XdrStream.Write(_handle);
+						_database.XdrStream.Flush();
 
 						_database.ReadResponse();
 					}
@@ -259,9 +259,9 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 				{
 					lock (_database.SyncObject)
 					{
-						_database.Write(IscCodes.op_rollback_retaining);
-						_database.Write(_handle);
-						_database.Flush();
+						_database.XdrStream.Write(IscCodes.op_rollback_retaining);
+						_database.XdrStream.Write(_handle);
+						_database.XdrStream.Flush();
 
 						_database.ReadResponse();
 					}
@@ -291,9 +291,9 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 					lock (_database.SyncObject)
 					{
-						_database.Write(IscCodes.op_prepare);
-						_database.Write(_handle);
-						_database.Flush();
+						_database.XdrStream.Write(IscCodes.op_prepare);
+						_database.XdrStream.Write(_handle);
+						_database.XdrStream.Flush();
 
 						_database.ReadResponse();
 					}
@@ -319,10 +319,10 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 					lock (_database.SyncObject)
 					{
-						_database.Write(IscCodes.op_prepare2);
-						_database.Write(_handle);
-						_database.WriteBuffer(buffer, buffer.Length);
-						_database.Flush();
+						_database.XdrStream.Write(IscCodes.op_prepare2);
+						_database.XdrStream.Write(_handle);
+						_database.XdrStream.WriteBuffer(buffer, buffer.Length);
+						_database.XdrStream.Flush();
 
 						_database.ReadResponse();
 					}
