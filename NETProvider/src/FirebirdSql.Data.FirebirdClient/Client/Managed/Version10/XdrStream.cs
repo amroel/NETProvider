@@ -177,8 +177,8 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 			if (!CanRead)
 				throw new InvalidOperationException("Read operations are not allowed by this stream");
 
-				return _innerStream.Read(buffer, offset, count);
-			}
+			return _innerStream.Read(buffer, offset, count);
+		}
 
 		public override void WriteByte(byte value)
 		{
@@ -194,8 +194,8 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 			if (!CanWrite)
 				throw new InvalidOperationException("Write operations are not allowed by this stream");
 
-				_innerStream.Write(buffer, offset, count);
-			}
+			_innerStream.Write(buffer, offset, count);
+		}
 
 		public byte[] ToArray()
 		{
@@ -203,7 +203,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 			var memoryStream = _innerStream as MemoryStream;
 			if (memoryStream == null)
-			throw new InvalidOperationException();
+				throw new InvalidOperationException();
 			return memoryStream.ToArray();
 		}
 
@@ -463,7 +463,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 			}
 			else
 			{
-				throw new IscException("invalid sqlind value: " + sqlInd);
+				throw new IscException($"Invalid {nameof(sqlInd)} value: {sqlInd}.");
 			}
 		}
 
@@ -723,7 +723,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 							break;
 
 						default:
-							throw new IscException("Unknown sql data type: " + param.DataType);
+							throw new IscException($"Unknown sql data type: {param.DataType}.");
 					}
 				}
 
@@ -742,8 +742,8 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 		private void CheckDisposed()
 		{
 			if (_innerStream == null)
-				throw new ObjectDisposedException("The XdrStream is closed.");
-			}
+				throw new ObjectDisposedException($"The {nameof(XdrStream)} is closed.");
+		}
 
 		private void ResetOperation()
 		{
