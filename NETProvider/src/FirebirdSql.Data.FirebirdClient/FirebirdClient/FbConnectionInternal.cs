@@ -206,8 +206,7 @@ namespace FirebirdSql.Data.FirebirdClient
 					_db.Dispose();
 				}
 				catch
-				{
-				}
+				{ }
 				finally
 				{
 					_db = null;

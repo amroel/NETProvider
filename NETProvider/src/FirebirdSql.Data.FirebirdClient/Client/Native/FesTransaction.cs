@@ -116,8 +116,7 @@ namespace FirebirdSql.Data.Client.Native
 						Rollback();
 					}
 					catch
-					{
-					}
+					{ }
 					finally
 					{
 						// release any managed resources
@@ -177,7 +176,7 @@ namespace FirebirdSql.Data.Client.Native
 
 					_db.FbClient.isc_start_multiple(
 						_statusVector,
-						ref	trHandle,
+						ref trHandle,
 						1,
 						tebData);
 

@@ -168,8 +168,7 @@ namespace FirebirdSql.Data.Client.Native
 						Detach();
 					}
 					catch
-					{
-					}
+					{ }
 					finally
 					{
 						// release any managed resources
@@ -209,7 +208,7 @@ namespace FirebirdSql.Data.Client.Native
 					_statusVector,
 					(short)databaseBuffer.Length,
 					databaseBuffer,
-					ref	dbHandle,
+					ref dbHandle,
 					(short)dpb.Length,
 					dpb.ToArray(),
 					0);
@@ -442,7 +441,7 @@ namespace FirebirdSql.Data.Client.Native
 
 				_fbClient.isc_database_info(
 					_statusVector,
-					ref	dbHandle,
+					ref dbHandle,
 					(short)items.Length,
 					items,
 					(short)bufferLength,

@@ -34,11 +34,11 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 		#region Fields
 
-		private int					_handle;
-		private bool				_disposed;
-		private GdsDatabase			_database;
-		private TransactionState	_state;
-		private object				_stateSyncRoot;
+		private int _handle;
+		private bool _disposed;
+		private GdsDatabase _database;
+		private TransactionState _state;
+		private object _stateSyncRoot;
 
 		#endregion
 
@@ -108,8 +108,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 						Rollback();
 					}
 					catch
-					{
-					}
+					{ }
 					finally
 					{
 						// release any managed resources

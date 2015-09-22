@@ -141,8 +141,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 				}
 			}
 			catch
-			{
-			}
+			{ }
 			finally
 			{
 				_charset = null;
@@ -521,7 +520,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 		public void WriteBlobBuffer(byte[] buffer)
 		{
-			int length = buffer.Length;	// 2 for short for buffer length
+			int length = buffer.Length; // 2 for short for buffer length
 
 			if (length > short.MaxValue)
 			{

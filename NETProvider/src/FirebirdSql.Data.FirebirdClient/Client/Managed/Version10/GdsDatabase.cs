@@ -167,8 +167,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 						Detach();
 					}
 					catch
-					{
-					}
+					{ }
 					finally
 					{
 						// release any managed resources
@@ -346,9 +345,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 							CloseConnection();
 						}
 						catch
-						{
-						}
-
+						{ }
 						throw;
 					}
 				}
@@ -397,8 +394,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 						CloseConnection();
 					}
 					catch
-					{
-					}
+					{ }
 				}
 			}
 		}

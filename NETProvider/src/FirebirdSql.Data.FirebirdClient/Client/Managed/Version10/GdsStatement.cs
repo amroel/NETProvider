@@ -30,18 +30,18 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 	{
 		#region Fields
 
-		protected int			    _handle;
-		protected GdsDatabase       _database;
-		private GdsTransaction      _transaction;
-		protected Descriptor	    _parameters;
-		protected Descriptor	    _fields;
-		protected StatementState	_state;
-		protected DbStatementType   _statementType;
-		protected bool			    _allRowsFetched;
-		private Queue<DbValue[]>    _rows;
-		private Queue<DbValue[]>    _outputParams;
-		private int				    _fetchSize;
-		private bool                _returnRecordsAffected;
+		protected int _handle;
+		protected GdsDatabase _database;
+		private GdsTransaction _transaction;
+		protected Descriptor _parameters;
+		protected Descriptor _fields;
+		protected StatementState _state;
+		protected DbStatementType _statementType;
+		protected bool _allRowsFetched;
+		private Queue<DbValue[]> _rows;
+		private Queue<DbValue[]> _outputParams;
+		private int _fetchSize;
+		private bool _returnRecordsAffected;
 
 		#endregion
 
@@ -183,8 +183,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 						Release();
 					}
 					catch
-					{
-					}
+					{ }
 					finally
 					{
 						// release any managed resources
