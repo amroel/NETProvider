@@ -152,9 +152,9 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 					_handle = response.ObjectHandle;
 					_state = TransactionState.Active;
 				}
-				catch (IOException)
+				catch (IOException ex)
 				{
-					throw new IscException(IscCodes.isc_net_read_err);
+					throw new IscException(IscCodes.isc_net_read_err, ex);
 				}
 			}
 		}
@@ -185,9 +185,9 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 					_state = TransactionState.NoTransaction;
 				}
-				catch (IOException)
+				catch (IOException ex)
 				{
-					throw new IscException(IscCodes.isc_net_read_err);
+					throw new IscException(IscCodes.isc_net_read_err, ex);
 				}
 			}
 		}
@@ -218,9 +218,9 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 					_state = TransactionState.NoTransaction;
 				}
-				catch (IOException)
+				catch (IOException ex)
 				{
-					throw new IscException(IscCodes.isc_net_read_err);
+					throw new IscException(IscCodes.isc_net_read_err, ex);
 				}
 			}
 		}
@@ -244,9 +244,9 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 					_state = TransactionState.Active;
 				}
-				catch (IOException)
+				catch (IOException ex)
 				{
-					throw new IscException(IscCodes.isc_net_read_err);
+					throw new IscException(IscCodes.isc_net_read_err, ex);
 				}
 			}
 		}
@@ -270,9 +270,9 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 					_state = TransactionState.Active;
 				}
-				catch (IOException)
+				catch (IOException ex)
 				{
-					throw new IscException(IscCodes.isc_net_read_err);
+					throw new IscException(IscCodes.isc_net_read_err, ex);
 				}
 			}
 		}
@@ -302,9 +302,9 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 					_state = TransactionState.Prepared;
 				}
-				catch (IOException)
+				catch (IOException ex)
 				{
-					throw new IscException(IscCodes.isc_net_read_err);
+					throw new IscException(IscCodes.isc_net_read_err, ex);
 				}
 			}
 		}
@@ -331,9 +331,9 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 					_state = TransactionState.Prepared;
 				}
-				catch (IOException)
+				catch (IOException ex)
 				{
-					throw new IscException(IscCodes.isc_net_read_err);
+					throw new IscException(IscCodes.isc_net_read_err, ex);
 				}
 			}
 		}

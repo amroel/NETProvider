@@ -273,12 +273,12 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 					_state = StatementState.Prepared;
 				}
-				catch (IOException)
+				catch (IOException ex)
 				{
 					// if the statement has been already allocated, it's now in error
 					if (_state == StatementState.Allocated)
 						_state = StatementState.Error;
-					throw new IscException(IscCodes.isc_net_read_err);
+					throw new IscException(IscCodes.isc_net_read_err, ex);
 				}
 			}
 		}
@@ -325,10 +325,10 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 					_state = StatementState.Executed;
 				}
-				catch (IOException)
+				catch (IOException ex)
 				{
 					_state = StatementState.Error;
-					throw new IscException(IscCodes.isc_net_read_err);
+					throw new IscException(IscCodes.isc_net_read_err, ex);
 				}
 			}
 		}
@@ -395,9 +395,9 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 							_database.ReadResponse();
 						}
 					}
-					catch (IOException)
+					catch (IOException ex)
 					{
-						throw new IscException(IscCodes.isc_net_read_err);
+						throw new IscException(IscCodes.isc_net_read_err, ex);
 					}
 				}
 			}
@@ -477,9 +477,9 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 			{
 				SendInfoSqlToBuffer(items, bufferLength);
 			}
-			catch (IOException)
+			catch (IOException ex)
 			{
-				throw new IscException(IscCodes.isc_net_read_err);
+				throw new IscException(IscCodes.isc_net_read_err, ex);
 			}
 		}
 
@@ -542,10 +542,10 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 				Clear();
 			}
-			catch (IOException)
+			catch (IOException ex)
 			{
 				_state = StatementState.Error;
-				throw new IscException(IscCodes.isc_net_read_err);
+				throw new IscException(IscCodes.isc_net_read_err, ex);
 			}
 		}
 
@@ -640,9 +640,9 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 					_outputParams.Enqueue(ReadDataRow());
 				}
 			}
-			catch (IOException)
+			catch (IOException ex)
 			{
-				throw new IscException(IscCodes.isc_net_read_err);
+				throw new IscException(IscCodes.isc_net_read_err, ex);
 			}
 		}
 		#endregion
@@ -677,9 +677,9 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 						value = _database.XdrStream.ReadValue(_fields[i]);
 						row[i] = new DbValue(this, _fields[i], value);
 					}
-					catch (IOException)
+					catch (IOException ex)
 					{
-						throw new IscException(IscCodes.isc_net_read_err);
+						throw new IscException(IscCodes.isc_net_read_err, ex);
 					}
 				}
 			}
