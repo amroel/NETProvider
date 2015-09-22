@@ -91,8 +91,6 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 			_portNumber = portNumber;
 			_packetSize = packetSize;
 			_characterSet = characterSet;
-
-			GC.SuppressFinalize(this);
 		}
 
 		#endregion
@@ -120,9 +118,6 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 				// Make	the	socket to connect to the Server
 				_socket.Connect(endPoint);
 				_networkStream = new NetworkStream(_socket, true);
-
-				GC.SuppressFinalize(_socket);
-				GC.SuppressFinalize(_networkStream);
 			}
 			catch (SocketException)
 			{
@@ -133,45 +128,44 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 		public virtual void Identify(string database)
 		{
 			// handles this.networkStream
-			XdrStream inputStream = CreateXdrStream();
-			XdrStream outputStream = CreateXdrStream();
-
+			using (var xdrStream = CreateXdrStream())
+			{
 			try
 			{
-				outputStream.Write(IscCodes.op_connect);
-				outputStream.Write(IscCodes.op_attach);
-				outputStream.Write(IscCodes.CONNECT_VERSION2);  // CONNECT_VERSION2
-				outputStream.Write(1);                          // Architecture	of client -	Generic
+					xdrStream.Write(IscCodes.op_connect);
+					xdrStream.Write(IscCodes.op_attach);
+					xdrStream.Write(IscCodes.CONNECT_VERSION2);          // CONNECT_VERSION2
+					xdrStream.Write(1);                                  // Architecture of client - Generic
 
-				outputStream.Write(database);                   // Database	path
-				outputStream.Write(3);                          // Protocol	versions understood
-				outputStream.WriteBuffer(UserIdentificationStuff());    // User	identification Stuff
+					xdrStream.Write(database);                           // Database path
+					xdrStream.Write(3);                                  // Protocol versions understood
+					xdrStream.WriteBuffer(UserIdentificationStuff());    // User identification Stuff
 
-				outputStream.Write(IscCodes.PROTOCOL_VERSION10);//	Protocol version
-				outputStream.Write(1);                          // Architecture	of client -	Generic
-				outputStream.Write(2);                          // Minimum type (ptype_rpc)
-				outputStream.Write(3);                          // Maximum type (ptype_batch_send)
-				outputStream.Write(0);                          // Preference weight
+					xdrStream.Write(IscCodes.PROTOCOL_VERSION10);    // Protocol version
+					xdrStream.Write(1);                              // Architecture of client - Generic
+					xdrStream.Write(2);                              // Minimum type (ptype_rpc)
+					xdrStream.Write(3);                              // Maximum type (ptype_batch_send)
+					xdrStream.Write(0);                              // Preference weight
 
-				outputStream.Write(IscCodes.PROTOCOL_VERSION11);//	Protocol version
-				outputStream.Write(1);                          // Architecture	of client -	Generic
-				outputStream.Write(2);                          // Minumum type (ptype_rpc)
-				outputStream.Write(5);                          // Maximum type (ptype_lazy_send)
-				outputStream.Write(1);                          // Preference weight
+					xdrStream.Write(IscCodes.PROTOCOL_VERSION11);    // Protocol version
+					xdrStream.Write(1);                              // Architecture of client - Generic
+					xdrStream.Write(2);                              // Minumum type (ptype_rpc)
+					xdrStream.Write(5);                              // Maximum type (ptype_lazy_send)
+					xdrStream.Write(1);                              // Preference weight
 
-				outputStream.Write(IscCodes.PROTOCOL_VERSION12);//	Protocol version
-				outputStream.Write(1);                          // Architecture	of client -	Generic
-				outputStream.Write(2);                          // Minumum type (ptype_rpc)
-				outputStream.Write(5);                          // Maximum type (ptype_lazy_send)
-				outputStream.Write(2);                          // Preference weight
+					xdrStream.Write(IscCodes.PROTOCOL_VERSION12);    // Protocol version
+					xdrStream.Write(1);                              // Architecture of client - Generic
+					xdrStream.Write(2);                              // Minumum type (ptype_rpc)
+					xdrStream.Write(5);                              // Maximum type (ptype_lazy_send)
+					xdrStream.Write(2);                              // Preference weight
 
-				outputStream.Flush();
+					xdrStream.Flush();
 
-				if (inputStream.ReadOperation() == IscCodes.op_accept)
+					if (xdrStream.ReadOperation() == IscCodes.op_accept)
 				{
-					_protocolVersion = inputStream.ReadInt32(); // Protocol	version
-					_protocolArchitecture = inputStream.ReadInt32();    // Architecture	for	protocol
-					_protocolMinimunType = inputStream.ReadInt32(); // Minimum type
+						_protocolVersion = xdrStream.ReadInt32(); // Protocol version
+						_protocolArchitecture = xdrStream.ReadInt32(); // Architecture for protocol
+						_protocolMinimunType = xdrStream.ReadInt32(); // Minimum type
 
 					if (_protocolVersion < 0)
 					{
@@ -197,22 +191,19 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 				throw new IscException(IscCodes.isc_network_error);
 			}
 		}
+		}
 
 		public XdrStream CreateXdrStream()
 		{
-			return new XdrStream(new BufferedStream(_networkStream), _characterSet);
+			return new XdrStream(new BufferedStream(_networkStream), _characterSet, false);
 		}
 
 		public virtual void Disconnect()
 		{
 			// socket is owned by network stream, so it'll be closed automatically
-			if (_networkStream != null)
-			{
-				_networkStream.Close();
-			}
-
-			_socket = null;
+			_networkStream?.Close();
 			_networkStream = null;
+			_socket = null;
 		}
 
 		#endregion

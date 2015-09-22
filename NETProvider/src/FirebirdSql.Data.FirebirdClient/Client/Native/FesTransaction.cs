@@ -81,8 +81,6 @@ namespace FirebirdSql.Data.Client.Native
 			_db = (FesDatabase)db;
 			_state = TransactionState.NoTransaction;
 			_statusVector = new IntPtr[IscCodes.ISC_STATUS_LENGTH];
-
-			GC.SuppressFinalize(this);
 		}
 
 		#endregion
@@ -112,14 +110,12 @@ namespace FirebirdSql.Data.Client.Native
 				{
 					try
 					{
-						// release any unmanaged resources
 						Rollback();
 					}
 					catch
 					{ }
 					finally
 					{
-						// release any managed resources
 						if (disposing)
 						{
 							_db = null;

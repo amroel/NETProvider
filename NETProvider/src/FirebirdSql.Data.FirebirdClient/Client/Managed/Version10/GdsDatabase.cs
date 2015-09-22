@@ -31,7 +31,7 @@ using FirebirdSql.Data.Common;
 
 namespace FirebirdSql.Data.Client.Managed.Version10
 {
-	internal class GdsDatabase : IDatabase, IDatabaseStream
+	internal class GdsDatabase : IDatabase
 	{
 		#region Callbacks
 
@@ -58,8 +58,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 		private int _eventsId;
 		private int _operation;
 		private bool _disposed;
-		private XdrStream _outputStream;
-		private XdrStream _inputStream;
+		private XdrStream _xdrStream;
 		private object _syncObject;
 
 		#endregion
@@ -107,6 +106,11 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 			get { return true; }
 		}
 
+		public XdrStream XdrStream
+		{
+			get { return _xdrStream; }
+		}
+
 		public object SyncObject
 		{
 			get
@@ -130,10 +134,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 			_charset = Charset.DefaultCharset;
 			_dialect = 3;
 			_packetSize = 8192;
-			_inputStream = _connection.CreateXdrStream();
-			_outputStream = _connection.CreateXdrStream();
-
-			GC.SuppressFinalize(this);
+			_xdrStream = _connection.CreateXdrStream();
 		}
 
 		#endregion
@@ -163,14 +164,12 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 				{
 					try
 					{
-						// release any unmanaged resources
 						Detach();
 					}
 					catch
 					{ }
 					finally
 					{
-						// release any managed resources
 						if (disposing)
 						{
 							_connection = null;
@@ -202,7 +201,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 				try
 				{
 					SendAttachToBuffer(dpb, database);
-					Flush();
+					XdrStream.Flush();
 					ProcessAttachResponse(ReadGenericResponse());
 				}
 				catch (IscException)
@@ -223,10 +222,10 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 		protected virtual void SendAttachToBuffer(DatabaseParameterBuffer dpb, string database)
 		{
 			// Attach to the database
-			Write(IscCodes.op_attach);
-			Write(0);                                           // Database object ID
-			WriteBuffer(Encoding.Default.GetBytes(database));   // Database PATH
-			WriteBuffer(dpb.ToArray());                         // DPB Parameter buffer
+			XdrStream.Write(IscCodes.op_attach);
+			XdrStream.Write(0);                                           // Database object ID
+			XdrStream.WriteBuffer(Encoding.Default.GetBytes(database));   // Database PATH
+			XdrStream.WriteBuffer(dpb.ToArray());                         // DPB Parameter buffer
 		}
 
 		protected virtual void ProcessAttachResponse(GenericResponse response)
@@ -259,11 +258,11 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 				{
 					if (_handle != 0)
 					{
-						Write(IscCodes.op_detach);
-						Write(_handle);
+						XdrStream.Write(IscCodes.op_detach);
+						XdrStream.Write(_handle);
 					}
-					Write(IscCodes.op_disconnect);
-					Flush();
+					XdrStream.Write(IscCodes.op_disconnect);
+					XdrStream.Flush();
 
 					// Close the Event Manager
 					CloseEventManager();
@@ -271,15 +270,9 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 					// Disconnect
 					CloseConnection();
 
+#warning Here
 					// Close Input and Output streams
-					if (_inputStream != null)
-					{
-						_inputStream.Close();
-					}
-					if (_outputStream != null)
-					{
-						_outputStream.Close();
-					}
+					_xdrStream?.Close();
 
 					// Clear members
 					_transactionCount = 0;
@@ -287,8 +280,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 					_dialect = 0;
 					_packetSize = 0;
 					_operation = 0;
-					_outputStream = null;
-					_inputStream = null;
+					_xdrStream = null;
 					_charset = null;
 					_connection = null;
 					_serverVersion = null;
@@ -330,7 +322,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 				try
 				{
 					SendCreateToBuffer(dpb, database);
-					Flush();
+					XdrStream.Flush();
 
 					try
 					{
@@ -358,10 +350,10 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 		protected virtual void SendCreateToBuffer(DatabaseParameterBuffer dpb, string database)
 		{
-			Write(IscCodes.op_create);
-			Write(0);
-			WriteBuffer(Encoding.Default.GetBytes(database));
-			WriteBuffer(dpb.ToArray());
+			XdrStream.Write(IscCodes.op_create);
+			XdrStream.Write(0);
+			XdrStream.WriteBuffer(Encoding.Default.GetBytes(database));
+			XdrStream.WriteBuffer(dpb.ToArray());
 		}
 
 		protected void ProcessCreateResponse(GenericResponse response)
@@ -375,9 +367,9 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 			{
 				try
 				{
-					Write(IscCodes.op_drop_database);
-					Write(_handle);
-					Flush();
+					XdrStream.Write(IscCodes.op_drop_database);
+					XdrStream.Write(_handle);
+					XdrStream.Flush();
 
 					ReadResponse();
 
@@ -409,29 +401,29 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 			{
 				try
 				{
-					Write(IscCodes.op_connect_request);
-					Write(IscCodes.P_REQ_async);    // Connection type
-					Write(_handle);                 // Related object
-					Write(0);                       // Partner identification
+					XdrStream.Write(IscCodes.op_connect_request);
+					XdrStream.Write(IscCodes.P_REQ_async);    // Connection type
+					XdrStream.Write(_handle);                 // Related object
+					XdrStream.Write(0);                       // Partner identification
 
-					Flush();
+					XdrStream.Flush();
 
 					ReadOperation();
 
-					auxHandle = ReadInt32();
+					auxHandle = XdrStream.ReadInt32();
 
 					// garbage
-					ReadBytes(8);
+					XdrStream.ReadBytes(8);
 
-					int respLen = ReadInt32();
+					int respLen = XdrStream.ReadInt32();
 					respLen += respLen % 4;
 
 					// sin_family
-					ReadBytes(2);
+					XdrStream.ReadBytes(2);
 					respLen -= 2;
 
 					// sin_port
-					byte[] buffer = ReadBytes(2);
+					byte[] buffer = XdrStream.ReadBytes(2);
 					portNumber = (ushort)IPAddress.NetworkToHostOrder(BitConverter.ToInt16(buffer, 0));
 					respLen -= 2;
 
@@ -439,7 +431,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 					// * so we must use the address that was used to connect the main socket, not the
 					// * address reported by the server.
 					// sin_addr
-					buffer = ReadBytes(4);
+					buffer = XdrStream.ReadBytes(4);
 					//ipAddress = string.Format(
 					//    CultureInfo.InvariantCulture,
 					//    "{0}.{1}.{2}.{3}",
@@ -448,7 +440,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 					respLen -= 4;
 
 					// garbage
-					ReadBytes(respLen);
+					XdrStream.ReadBytes(respLen);
 
 					// Read Status Vector
 					ReadStatusVector();
@@ -512,14 +504,14 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 					EventParameterBuffer epb = events.ToEpb();
 
-					Write(IscCodes.op_que_events);
-					Write(_handle);                 // Database object id
-					WriteBuffer(epb.ToArray());     // Event description block
-					Write(0);                       // Address of ast routine
-					Write(0);                       // Argument to ast routine
-					Write(events.LocalId);          // Client side id of remote event
+					XdrStream.Write(IscCodes.op_que_events);
+					XdrStream.Write(_handle);                 // Database object id
+					XdrStream.WriteBuffer(epb.ToArray());     // Event description block
+					XdrStream.Write(0);                       // Address of ast routine
+					XdrStream.Write(0);                       // Argument to ast routine
+					XdrStream.Write(events.LocalId);          // Client side id of remote event
 
-					Flush();
+					XdrStream.Flush();
 
 					GenericResponse response = (GenericResponse)ReadResponse();
 
@@ -539,11 +531,11 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 			{
 				try
 				{
-					Write(IscCodes.op_cancel_events);
-					Write(_handle);             // Database object id
-					Write(events.LocalId);      // Event ID
+					XdrStream.Write(IscCodes.op_cancel_events);
+					XdrStream.Write(_handle);             // Database object id
+					XdrStream.Write(events.LocalId);      // Event ID
 
-					Flush();
+					XdrStream.Flush();
 
 					ReadResponse();
 
@@ -660,12 +652,12 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 		public virtual int ReadOperation()
 		{
-			return _inputStream.ReadOperation();
+			return _xdrStream.ReadOperation();
 		}
 
 		public virtual int NextOperation()
 		{
-			return _inputStream.ReadNextOperation();
+			return _xdrStream.ReadNextOperation();
 		}
 
 		public virtual IResponse ReadResponse()
@@ -697,12 +689,12 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 			while (!eof)
 			{
-				int arg = ReadInt32();
+				int arg = XdrStream.ReadInt32();
 
 				switch (arg)
 				{
 					case IscCodes.isc_arg_gds:
-						int er = ReadInt32();
+						int er = XdrStream.ReadInt32();
 						if (er != 0)
 						{
 							if (exception == null)
@@ -723,19 +715,19 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 					case IscCodes.isc_arg_interpreted:
 					case IscCodes.isc_arg_string:
-						exception.Errors.Add(new IscError(arg, ReadString()));
+						exception.Errors.Add(new IscError(arg, XdrStream.ReadString()));
 						break;
 
 					case IscCodes.isc_arg_number:
-						exception.Errors.Add(new IscError(arg, ReadInt32()));
+						exception.Errors.Add(new IscError(arg, XdrStream.ReadInt32()));
 						break;
 
 					case IscCodes.isc_arg_sql_state:
-						exception.Errors.Add(new IscError(arg, ReadString()));
+						exception.Errors.Add(new IscError(arg, XdrStream.ReadString()));
 						break;
 
 					default:
-						int e = ReadInt32();
+						int e = XdrStream.ReadInt32();
 						if (e != 0)
 						{
 							if (exception == null)
@@ -763,7 +755,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 				try
 				{
 					DoReleaseObjectPacket(op, id);
-					Flush();
+					XdrStream.Flush();
 					ProcessReleaseObjectResponse(ReadResponse());
 				}
 				catch (IOException)
@@ -794,16 +786,16 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 			{
 				case IscCodes.op_response:
 					return new GenericResponse(
-						ReadInt32(),
-						ReadInt64(),
-						ReadBuffer(),
+						XdrStream.ReadInt32(),
+						XdrStream.ReadInt64(),
+						XdrStream.ReadBuffer(),
 						ReadStatusVector());
 
 				case IscCodes.op_fetch_response:
-					return new FetchResponse(ReadInt32(), ReadInt32());
+					return new FetchResponse(XdrStream.ReadInt32(), XdrStream.ReadInt32());
 
 				case IscCodes.op_sql_response:
-					return new SqlResponse(ReadInt32());
+					return new SqlResponse(XdrStream.ReadInt32());
 
 				default:
 					return null;
@@ -820,13 +812,13 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 				try
 				{
 					// see src/remote/protocol.h for packet	definition (p_info struct)
-					Write(IscCodes.op_info_database);   //	operation
-					Write(_handle);             //	db_handle
-					Write(0);                           //	incarnation
-					WriteBuffer(items, items.Length);   //	items
-					Write(bufferLength);                //	result buffer length
+					XdrStream.Write(IscCodes.op_info_database);   //	operation
+					XdrStream.Write(_handle);             //	db_handle
+					XdrStream.Write(0);                           //	incarnation
+					XdrStream.WriteBuffer(items, items.Length);   //	items
+					XdrStream.Write(bufferLength);                //	result buffer length
 
-					Flush();
+					XdrStream.Flush();
 
 					GenericResponse response = (GenericResponse)ReadResponse();
 
@@ -848,216 +840,13 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 		protected void DoReleaseObjectPacket(int op, int id)
 		{
-			Write(op);
-			Write(id);
+			XdrStream.Write(op);
+			XdrStream.Write(id);
 		}
 
 		protected void ProcessReleaseObjectResponse(IResponse response)
 		{ }
 
 		#endregion
-
-		#region Read Members
-
-		public byte[] ReadBytes(int count)
-		{
-			return _inputStream.ReadBytes(count);
 		}
-
-		public byte[] ReadOpaque(int length)
-		{
-			return _inputStream.ReadOpaque(length);
-		}
-
-		public byte[] ReadBuffer()
-		{
-			return _inputStream.ReadBuffer();
-		}
-
-		public string ReadString()
-		{
-			return _inputStream.ReadString();
-		}
-
-		public string ReadString(int length)
-		{
-			return _inputStream.ReadString(length);
-		}
-
-		public string ReadString(Charset charset)
-		{
-			return _inputStream.ReadString(charset);
-		}
-
-		public string ReadString(Charset charset, int length)
-		{
-			return _inputStream.ReadString(charset, length);
-		}
-
-		public short ReadInt16()
-		{
-			return _inputStream.ReadInt16();
-		}
-
-		public int ReadInt32()
-		{
-			return _inputStream.ReadInt32();
-		}
-
-		public long ReadInt64()
-		{
-			return _inputStream.ReadInt64();
-		}
-
-		public Guid ReadGuid(int length)
-		{
-			return _inputStream.ReadGuid(length);
-		}
-
-		public float ReadSingle()
-		{
-			return _inputStream.ReadSingle();
-		}
-
-		public double ReadDouble()
-		{
-			return _inputStream.ReadDouble();
-		}
-
-		public DateTime ReadDateTime()
-		{
-			return _inputStream.ReadDateTime();
-		}
-
-		public DateTime ReadDate()
-		{
-			return _inputStream.ReadDate();
-		}
-
-		public TimeSpan ReadTime()
-		{
-			return _inputStream.ReadTime();
-		}
-
-		public decimal ReadDecimal(int type, int scale)
-		{
-			return _inputStream.ReadDecimal(type, scale);
-		}
-
-		public object ReadValue(DbField field)
-		{
-			return _inputStream.ReadValue(field);
-		}
-
-		#endregion
-
-		#region Write Methods
-
-		public void WriteOpaque(byte[] buffer)
-		{
-			_outputStream.WriteOpaque(buffer);
-		}
-
-		public void WriteOpaque(byte[] buffer, int length)
-		{
-			_outputStream.WriteOpaque(buffer, length);
-		}
-
-		public void WriteBuffer(byte[] buffer)
-		{
-			_outputStream.WriteBuffer(buffer);
-		}
-
-		public void WriteBuffer(byte[] buffer, int length)
-		{
-			_outputStream.WriteBuffer(buffer, length);
-		}
-
-		public void WriteBlobBuffer(byte[] buffer)
-		{
-			_outputStream.WriteBlobBuffer(buffer);
-		}
-
-		public void WriteTyped(int type, byte[] buffer)
-		{
-			_outputStream.WriteTyped(type, buffer);
-		}
-
-		public void Write(string value)
-		{
-			_outputStream.Write(value);
-		}
-
-		public void Write(short value)
-		{
-			_outputStream.Write(value);
-		}
-
-		public void Write(int value)
-		{
-			_outputStream.Write(value);
-		}
-
-		public void Write(long value)
-		{
-			_outputStream.Write(value);
-		}
-
-		public void Write(float value)
-		{
-			_outputStream.Write(value);
-		}
-
-		public void Write(double value)
-		{
-			_outputStream.Write(value);
-		}
-
-		public void Write(decimal value, int type, int scale)
-		{
-			_outputStream.Write(value, type, scale);
-		}
-
-		public void Write(bool value)
-		{
-			_outputStream.Write(value);
-		}
-
-		public void Write(DateTime value)
-		{
-			_outputStream.Write(value);
-		}
-
-		public void WriteDate(DateTime value)
-		{
-			_outputStream.Write(value);
-		}
-
-		public void WriteTime(DateTime value)
-		{
-			_outputStream.Write(value);
-		}
-
-		public void Write(Descriptor value)
-		{
-			_outputStream.Write(value);
-		}
-
-		public void Write(DbField value)
-		{
-			_outputStream.Write(value);
-		}
-
-		public void Write(byte[] buffer, int offset, int count)
-		{
-			_outputStream.Write(buffer, offset, count);
-		}
-
-		public void Flush()
-		{
-			_outputStream.Flush();
-		}
-
-		#endregion
-	}
 }

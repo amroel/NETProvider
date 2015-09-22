@@ -67,8 +67,9 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 		#region Fields
 
-		private Charset _charset;
 		private Stream _innerStream;
+		private Charset _charset;
+		private bool _ownsStream;
 		private int _operation;
 
 		#endregion
@@ -110,21 +111,20 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 		{ }
 
 		public XdrStream(Charset charset)
-			: this(new MemoryStream(), charset)
+			: this(new MemoryStream(), charset, true)
 		{ }
 
 		public XdrStream(byte[] buffer, Charset charset)
-			: this(new MemoryStream(buffer), charset)
+			: this(new MemoryStream(buffer), charset, true)
 		{ }
 
-		public XdrStream(Stream innerStream, Charset charset)
+		public XdrStream(Stream innerStream, Charset charset, bool ownsStream)
 			: base()
 		{
 			_innerStream = innerStream;
 			_charset = charset;
+			_ownsStream = ownsStream;
 			ResetOperation();
-
-			GC.SuppressFinalize(innerStream);
 		}
 
 		#endregion
@@ -135,17 +135,17 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 		{
 			try
 			{
-				if (_innerStream != null)
+				if (_ownsStream)
 				{
-					_innerStream.Close();
+					_innerStream?.Close();
 				}
 			}
 			catch
 			{ }
 			finally
 			{
-				_charset = null;
 				_innerStream = null;
+				_charset = null;
 			}
 		}
 
@@ -174,13 +174,11 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 		{
 			CheckDisposed();
 
-			if (CanRead)
-			{
+			if (!CanRead)
+				throw new InvalidOperationException("Read operations are not allowed by this stream");
+
 				return _innerStream.Read(buffer, offset, count);
 			}
-
-			throw new InvalidOperationException("Read operations are not allowed by this stream");
-		}
 
 		public override void WriteByte(byte value)
 		{
@@ -193,26 +191,20 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 		{
 			CheckDisposed();
 
-			if (CanWrite)
-			{
+			if (!CanWrite)
+				throw new InvalidOperationException("Write operations are not allowed by this stream");
+
 				_innerStream.Write(buffer, offset, count);
 			}
-			else
-			{
-				throw new InvalidOperationException("Write operations are not allowed by this stream");
-			}
-		}
 
 		public byte[] ToArray()
 		{
 			CheckDisposed();
 
-			if (_innerStream is MemoryStream)
-			{
-				return ((MemoryStream)_innerStream).ToArray();
-			}
-
+			var memoryStream = _innerStream as MemoryStream;
+			if (memoryStream == null)
 			throw new InvalidOperationException();
+			return memoryStream.ToArray();
 		}
 
 		#endregion
@@ -221,7 +213,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 		public virtual int ReadOperation()
 		{
-			int op = ValidOperationAvailable ? _operation : ReadNextOperation();
+			var op = ValidOperationAvailable ? _operation : ReadNextOperation();
 			ResetOperation();
 			return op;
 		}
@@ -248,12 +240,11 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 		public byte[] ReadBytes(int count)
 		{
-			byte[] buffer = new byte[count];
-
+			var buffer = new byte[count];
 			if (count > 0)
 			{
-				int toRead = count;
-				int currentlyRead = -1;
+				var toRead = count;
+				var currentlyRead = -1;
 				while (toRead > 0 && currentlyRead != 0)
 				{
 					toRead -= (currentlyRead = Read(buffer, count - toRead, toRead));
@@ -263,20 +254,17 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 					throw new IOException();
 				}
 			}
-
 			return buffer;
 		}
 
 		public byte[] ReadOpaque(int length)
 		{
-			byte[] buffer = ReadBytes(length);
-
-			int padLength = ((4 - length) & 3);
+			var buffer = ReadBytes(length);
+			var padLength = ((4 - length) & 3);
 			if (padLength > 0)
 			{
 				Read(Pad, 0, padLength);
 			}
-
 			return buffer;
 		}
 
@@ -302,8 +290,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 		public string ReadString(Charset charset, int length)
 		{
-			byte[] buffer = ReadOpaque(length);
-
+			var buffer = ReadOpaque(length);
 			return charset.GetString(buffer, 0, buffer.Length);
 		}
 
@@ -341,7 +328,6 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 		{
 			DateTime date = ReadDate();
 			TimeSpan time = ReadTime();
-
 			return new DateTime(date.Year, date.Month, date.Day, time.Hours, time.Minutes, time.Seconds, time.Milliseconds);
 		}
 
@@ -357,8 +343,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 		public decimal ReadDecimal(int type, int scale)
 		{
-			decimal value = 0;
-
+			var value = 0m;
 			switch (type & ~1)
 			{
 				case IscCodes.SQL_SHORT:
@@ -379,14 +364,13 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 					value = Convert.ToDecimal(ReadDouble());
 					break;
 			}
-
 			return value;
 		}
 
 		public object ReadValue(DbField field)
 		{
 			object fieldValue = null;
-			Charset innerCharset = (_charset.Name != "NONE") ? _charset : field.Charset;
+			Charset innerCharset = _charset.Name != "NONE" ? _charset : field.Charset;
 
 			switch (field.DbDataType)
 			{
@@ -510,7 +494,6 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 		public void WriteBuffer(byte[] buffer, int length)
 		{
 			Write(length);
-
 			if (buffer != null && length > 0)
 			{
 				Write(buffer, 0, length);
@@ -520,26 +503,20 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 		public void WriteBlobBuffer(byte[] buffer)
 		{
-			int length = buffer.Length; // 2 for short for buffer length
-
+			var length = buffer.Length; // 2 for short for buffer length
 			if (length > short.MaxValue)
-			{
-				throw (new IOException()); //Need a	value???
-			}
-
+				throw new IOException();
 			Write(length + 2);
 			Write(length + 2);  //bizarre but true!	three copies of	the	length
 			WriteByte((byte)((length >> 0) & 0xff));
 			WriteByte((byte)((length >> 8) & 0xff));
 			Write(buffer, 0, length);
-
 			Write(Pad, 0, ((4 - length + 2) & 3));
 		}
 
 		public void WriteTyped(int type, byte[] buffer)
 		{
 			int length;
-
 			if (buffer == null)
 			{
 				Write(1);
@@ -559,7 +536,6 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 		public void Write(string value)
 		{
 			byte[] buffer = _charset.GetBytes(value);
-
 			WriteBuffer(buffer, buffer.Length);
 		}
 
@@ -580,22 +556,19 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 		public void Write(float value)
 		{
-			byte[] buffer = BitConverter.GetBytes(value);
-
+			var buffer = BitConverter.GetBytes(value);
 			Write(BitConverter.ToInt32(buffer, 0));
 		}
 
 		public void Write(double value)
 		{
-			byte[] buffer = BitConverter.GetBytes(value);
-
+			var buffer = BitConverter.GetBytes(value);
 			Write(BitConverter.ToInt64(buffer, 0));
 		}
 
 		public void Write(decimal value, int type, int scale)
 		{
 			object numeric = TypeEncoder.EncodeDecimal(value, scale, type);
-
 			switch (type & ~1)
 			{
 				case IscCodes.SQL_SHORT:
@@ -641,7 +614,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 		public void Write(Descriptor descriptor)
 		{
-			for (int i = 0; i < descriptor.Count; i++)
+			for (var i = 0; i < descriptor.Count; i++)
 			{
 				Write(descriptor[i]);
 			}
@@ -769,10 +742,8 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 		private void CheckDisposed()
 		{
 			if (_innerStream == null)
-			{
 				throw new ObjectDisposedException("The XdrStream is closed.");
 			}
-		}
 
 		private void ResetOperation()
 		{
@@ -781,7 +752,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 		#endregion
 
-		#region Private Methods
+		#region Private Properties
 
 		private bool ValidOperationAvailable
 		{

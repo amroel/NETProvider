@@ -133,8 +133,6 @@ namespace FirebirdSql.Data.Client.Native
 			_dialect = 3;
 			_packetSize = 8192;
 			_statusVector = new IntPtr[IscCodes.ISC_STATUS_LENGTH];
-
-			GC.SuppressFinalize(this);
 		}
 
 		#endregion
@@ -164,14 +162,12 @@ namespace FirebirdSql.Data.Client.Native
 				{
 					try
 					{
-						// release any unmanaged resources
 						Detach();
 					}
 					catch
 					{ }
 					finally
 					{
-						// release any managed resources
 						if (disposing)
 						{
 							_warningMessage = null;

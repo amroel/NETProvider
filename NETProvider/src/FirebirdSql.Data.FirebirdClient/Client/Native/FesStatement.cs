@@ -161,8 +161,6 @@ namespace FirebirdSql.Data.Client.Native
 			{
 				Transaction = transaction;
 			}
-
-			GC.SuppressFinalize(this);
 		}
 
 		#endregion
@@ -175,14 +173,12 @@ namespace FirebirdSql.Data.Client.Native
 			{
 				try
 				{
-					// release any unmanaged resources
 					Release();
 				}
 				catch
 				{ }
 				finally
 				{
-					// release any managed resources
 					if (disposing)
 					{
 						Clear();
