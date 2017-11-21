@@ -1,8 +1,10 @@
 *.suo
 *.user
+*.lock.json
+.vs
 bin
 obj
-DataDesignerExtensibility/installer/out/
-DataDesignerExtensibility/installer/in/
-NETProvider/deploy/out
-*.nupkg
+packages
+DDEX/installer/out/
+DDEX/installer/in/
+Provider/deploy/out/
