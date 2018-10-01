@@ -1,24 +1,21 @@
 ﻿/*
- *	Firebird ADO.NET Data provider for .NET and Mono
+ *    The contents of this file are subject to the Initial
+ *    Developer's Public License Version 1.0 (the "License");
+ *    you may not use this file except in compliance with the
+ *    License. You may obtain a copy of the License at
+ *    https://github.com/FirebirdSQL/NETProvider/blob/master/license.txt.
  *
- *	   The contents of this file are subject to the Initial
- *	   Developer's Public License Version 1.0 (the "License");
- *	   you may not use this file except in compliance with the
- *	   License. You may obtain a copy of the License at
- *	   http://www.firebirdsql.org/index.php?op=doc&id=idpl
+ *    Software distributed under the License is distributed on
+ *    an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
+ *    express or implied. See the License for the specific
+ *    language governing rights and limitations under the License.
  *
- *	   Software distributed under the License is distributed on
- *	   an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
- *	   express or implied. See the License for the specific
- *	   language governing rights and limitations under the License.
- *
- *	Copyright (c) 2002 - 2007 Carlos Guzman Alvarez
- *	Copyright (c) 2007 - 2017 Jiri Cincura (jiri@cincura.net)
- *	All Rights Reserved.
+ *    All Rights Reserved.
  */
 
+//$Authors = Carlos Guzman Alvarez, Jiri Cincura (jiri@cincura.net)
+
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 using System.IO;
@@ -49,7 +46,7 @@ namespace FirebirdSql.Data.Client.Managed.Version11
 
 			try
 			{
-				int numberOfResponses = 0;
+				var numberOfResponses = 0;
 				if (_state == StatementState.Deallocated)
 				{
 					SendAllocateToBuffer();
@@ -74,11 +71,11 @@ namespace FirebirdSql.Data.Client.Managed.Version11
 					}
 
 					numberOfResponses--;
-					GenericResponse prepareResponse = _database.ReadGenericResponse();
-					bool deferredExecute = ((prepareResponse.ObjectHandle & IscCodes.STMT_DEFER_EXECUTE) == IscCodes.STMT_DEFER_EXECUTE);
+					var prepareResponse = _database.ReadGenericResponse();
+					var deferredExecute = ((prepareResponse.ObjectHandle & IscCodes.STMT_DEFER_EXECUTE) == IscCodes.STMT_DEFER_EXECUTE);
 
 					numberOfResponses--;
-					GenericResponse statementTypeResponse = _database.ReadGenericResponse();
+					var statementTypeResponse = _database.ReadGenericResponse();
 
 					if (allocateResponse != null)
 					{
@@ -117,7 +114,7 @@ namespace FirebirdSql.Data.Client.Managed.Version11
 
 				SendExecuteToBuffer();
 
-				bool readRowsAffectedResponse = false;
+				var readRowsAffectedResponse = false;
 				if (ReturnRecordsAffected &&
 					(StatementType == DbStatementType.Insert ||
 					StatementType == DbStatementType.Delete ||
@@ -132,7 +129,7 @@ namespace FirebirdSql.Data.Client.Managed.Version11
 
 				_database.XdrStream.Flush();
 
-				int numberOfResponses =
+				var numberOfResponses =
 					(StatementType == DbStatementType.StoredProcedure ? 1 : 0) + 1 + (readRowsAffectedResponse ? 1 : 0);
 				try
 				{
@@ -145,7 +142,7 @@ namespace FirebirdSql.Data.Client.Managed.Version11
 					}
 
 					numberOfResponses--;
-					GenericResponse executeResponse = _database.ReadGenericResponse();
+					var executeResponse = _database.ReadGenericResponse();
 
 					GenericResponse rowsAffectedResponse = null;
 					if (readRowsAffectedResponse)

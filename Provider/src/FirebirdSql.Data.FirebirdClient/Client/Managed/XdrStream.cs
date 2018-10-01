@@ -1,24 +1,21 @@
 ﻿/*
- *	Firebird ADO.NET Data provider for .NET and Mono
+ *    The contents of this file are subject to the Initial
+ *    Developer's Public License Version 1.0 (the "License");
+ *    you may not use this file except in compliance with the
+ *    License. You may obtain a copy of the License at
+ *    https://github.com/FirebirdSQL/NETProvider/blob/master/license.txt.
  *
- *	   The contents of this file are subject to the Initial
- *	   Developer's Public License Version 1.0 (the "License");
- *	   you may not use this file except in compliance with the
- *	   License. You may obtain a copy of the License at
- *	   http://www.firebirdsql.org/index.php?op=doc&id=idpl
+ *    Software distributed under the License is distributed on
+ *    an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
+ *    express or implied. See the License for the specific
+ *    language governing rights and limitations under the License.
  *
- *	   Software distributed under the License is distributed on
- *	   an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
- *	   express or implied. See the License for the specific
- *	   language governing rights and limitations under the License.
- *
- *	Copyright (c) 2002, 2007 Carlos Guzman Alvarez
- *	Copyright (c) 2014 - 2017 Jiri Cincura (jiri@cincura.net)
- *	All Rights Reserved.
+ *    All Rights Reserved.
  */
 
+//$Authors = Carlos Guzman Alvarez, Jiri Cincura (jiri@cincura.net)
+
 using System;
-using System.Collections;
 using System.IO;
 using System.Net;
 using System.Text;
@@ -36,39 +33,8 @@ namespace FirebirdSql.Data.Client.Managed
 		#region Constants
 
 		private const int PreferredBufferSize = 32 * 1024;
-
-		#endregion
-
-		#region Static Fields
-
-		private static byte[] fill;
-		private static byte[] pad;
-
-		#endregion
-
-		#region Static Properties
-
-		internal static byte[] Fill
-		{
-			get
-			{
-				if (fill == null)
-				{
-					fill = new byte[32767];
-					for (int i = 0; i < fill.Length; i++)
-					{
-						fill[i] = 32;
-					}
-				}
-
-				return fill;
-			}
-		}
-
-		private static byte[] Pad
-		{
-			get { return pad ?? (pad = new byte[] { 0, 0, 0, 0 }); }
-		}
+		private const int InvalidOperation = -1;
+		private const int CompressionBufferSize = 1 * 1024 * 1024;
 
 		#endregion
 
@@ -81,11 +47,14 @@ namespace FirebirdSql.Data.Client.Managed
 
 		private long _position;
 		private List<byte> _outputBuffer;
-		private ReadBuffer _inputBuffer;
+		private Queue<byte> _inputBuffer;
+		private byte[] _readBuffer;
+		private byte[] _smallBuffer;
 		private Ionic.Zlib.ZlibCodec _deflate;
 		private Ionic.Zlib.ZlibCodec _inflate;
 		private byte[] _compressionBuffer;
 
+		private bool _ioFailed;
 		private int _operation;
 
 		#endregion
@@ -120,6 +89,15 @@ namespace FirebirdSql.Data.Client.Managed
 
 		#endregion
 
+		#region Properties
+
+		public bool IOFailed
+		{
+			get { return _ioFailed; }
+		}
+
+		#endregion
+
 		#region Constructors
 
 		public XdrStream()
@@ -144,14 +122,17 @@ namespace FirebirdSql.Data.Client.Managed
 
 			_position = 0;
 			_outputBuffer = new List<byte>(PreferredBufferSize);
-			_inputBuffer = new ReadBuffer(PreferredBufferSize);
+			_inputBuffer = new Queue<byte>(PreferredBufferSize);
+			_readBuffer = new byte[PreferredBufferSize];
+			_smallBuffer = new byte[8];
 			if (_compression)
 			{
 				_deflate = new Ionic.Zlib.ZlibCodec(Ionic.Zlib.CompressionMode.Compress);
 				_inflate = new Ionic.Zlib.ZlibCodec(Ionic.Zlib.CompressionMode.Decompress);
-				_compressionBuffer = new byte[1024 * 1024];
+				_compressionBuffer = new byte[CompressionBufferSize];
 			}
 
+			_ioFailed = false;
 			ResetOperation();
 		}
 
@@ -181,22 +162,19 @@ namespace FirebirdSql.Data.Client.Managed
 			var count = buffer.Length;
 			if (_compression)
 			{
-				_deflate.OutputBuffer = _compressionBuffer;
-				_deflate.AvailableBytesOut = _compressionBuffer.Length;
-				_deflate.NextOut = 0;
-				_deflate.InputBuffer = buffer;
-				_deflate.AvailableBytesIn = buffer.Length;
-				_deflate.NextIn = 0;
-				var rc = _deflate.Deflate(Ionic.Zlib.FlushType.Sync);
-				if (rc != Ionic.Zlib.ZlibConstants.Z_OK)
-					throw new IOException($"Error '{rc}' while compressing the data.");
-				if (_deflate.AvailableBytesIn != 0)
-					throw new IOException("Compression buffer too small.");
+				count = HandleCompression(buffer, count);
 				buffer = _compressionBuffer;
-				count = _deflate.NextOut;
 			}
-			_innerStream.Write(buffer, 0, count);
-			_innerStream.Flush();
+			try
+			{
+				_innerStream.Write(buffer, 0, count);
+				_innerStream.Flush();
+			}
+			catch (IOException)
+			{
+				_ioFailed = true;
+				throw;
+			}
 		}
 
 		public override void SetLength(long length)
@@ -226,70 +204,63 @@ namespace FirebirdSql.Data.Client.Managed
 			CheckDisposed();
 			EnsureReadable();
 
-			if (_inputBuffer.Length < count)
+			if (_inputBuffer.Count < count)
 			{
-				var readBuffer = new byte[PreferredBufferSize];
-				var read = _innerStream.Read(readBuffer, 0, readBuffer.Length);
+				var readBuffer = _readBuffer;
+				var read = default(int);
+				try
+				{
+					read = _innerStream.Read(readBuffer, 0, readBuffer.Length);
+				}
+				catch (IOException)
+				{
+					_ioFailed = true;
+					throw;
+				}
 				if (read != 0)
 				{
 					if (_compression)
 					{
-						_inflate.OutputBuffer = _compressionBuffer;
-						_inflate.AvailableBytesOut = _compressionBuffer.Length;
-						_inflate.NextOut = 0;
-						_inflate.InputBuffer = readBuffer;
-						_inflate.AvailableBytesIn = read;
-						_inflate.NextIn = 0;
-						var rc = _inflate.Inflate(Ionic.Zlib.FlushType.None);
-						if (rc != Ionic.Zlib.ZlibConstants.Z_OK)
-							throw new IOException($"Error '{rc}' while decompressing the data.");
-						if (_inflate.AvailableBytesIn != 0)
-							throw new IOException("Decompression buffer too small.");
+						read = HandleDecompression(readBuffer, read);
 						readBuffer = _compressionBuffer;
-						read = _inflate.NextOut;
 					}
-					_inputBuffer.AddRange(readBuffer, read);
+					WriteToInputBuffer(readBuffer, read);
 				}
 			}
-			var dataLength = _inputBuffer.ReadInto(ref buffer, offset, count);
+			var dataLength = ReadFromInputBuffer(buffer, offset, count);
 			_position += dataLength;
 			return dataLength;
 		}
-#if NET40
-		public async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken = default(CancellationToken))
-#else
+
 		public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
-#endif
 		{
 			CheckDisposed();
 			EnsureReadable();
 
-			if (_inputBuffer.Length < count)
+			if (_inputBuffer.Count < count)
 			{
-				var readBuffer = new byte[PreferredBufferSize];
-				var read = await _innerStream.ReadAsync(readBuffer, 0, readBuffer.Length).ConfigureAwait(false);
+				var readBuffer = _readBuffer;
+				var read = default(int);
+				try
+				{
+					read = await _innerStream.ReadAsync(readBuffer, 0, readBuffer.Length).ConfigureAwait(false);
+				}
+				catch (IOException)
+				{
+					_ioFailed = true;
+					throw;
+				}
 				if (read != 0)
 				{
 					if (_compression)
 					{
-						_inflate.OutputBuffer = _compressionBuffer;
-						_inflate.AvailableBytesOut = _compressionBuffer.Length;
-						_inflate.NextOut = 0;
-						_inflate.InputBuffer = readBuffer;
-						_inflate.AvailableBytesIn = read;
-						_inflate.NextIn = 0;
-						var rc = _inflate.Inflate(Ionic.Zlib.FlushType.None);
-						if (rc != Ionic.Zlib.ZlibConstants.Z_OK)
-							throw new IOException($"Error '{rc}' while decompressing the data.");
-						if (_inflate.AvailableBytesIn != 0)
-							throw new IOException("Decompression buffer too small.");
+						read = HandleDecompression(readBuffer, read);
 						readBuffer = _compressionBuffer;
-						read = _inflate.NextOut;
 					}
-					_inputBuffer.AddRange(readBuffer, read);
+					WriteToInputBuffer(readBuffer, read);
 				}
 			}
-			var dataLength = _inputBuffer.ReadInto(ref buffer, offset, count);
+			var dataLength = ReadFromInputBuffer(buffer, offset, count);
 			_position += dataLength;
 			return dataLength;
 		}
@@ -307,23 +278,14 @@ namespace FirebirdSql.Data.Client.Managed
 			CheckDisposed();
 			EnsureWritable();
 
-#if NET40
-			_outputBuffer.Capacity = Math.Max(_outputBuffer.Capacity, _outputBuffer.Count + count);
-			for (var i = offset; i < count; i++)
-			{
-				_outputBuffer.Add(buffer[i]);
-			}
-#else
 			_outputBuffer.AddRange(new ArraySegment<byte>(buffer, offset, count));
-#endif
 		}
 
 		public byte[] ToArray()
 		{
 			CheckDisposed();
 
-			var memoryStream = _innerStream as MemoryStream;
-			if (memoryStream == null)
+			if (!(_innerStream is MemoryStream memoryStream))
 				throw new InvalidOperationException();
 			Flush();
 			return memoryStream.ToArray();
@@ -335,7 +297,7 @@ namespace FirebirdSql.Data.Client.Managed
 
 		public int ReadOperation()
 		{
-			var op = ValidOperationAvailable ? _operation : ReadNextOperation();
+			var op = _operation != InvalidOperation ? _operation : ReadNextOperation();
 			ResetOperation();
 			return op;
 		}
@@ -372,16 +334,15 @@ namespace FirebirdSql.Data.Client.Managed
 
 		private void ResetOperation()
 		{
-			_operation = -1;
+			_operation = InvalidOperation;
 		}
 
 		#endregion
 
 		#region XDR Read Methods
 
-		public byte[] ReadBytes(int count)
+		public byte[] ReadBytes(byte[] buffer, int count)
 		{
-			var buffer = new byte[count];
 			if (count > 0)
 			{
 				var toRead = count;
@@ -392,14 +353,14 @@ namespace FirebirdSql.Data.Client.Managed
 				}
 				if (toRead == count)
 				{
+					_ioFailed = true;
 					throw new IOException();
 				}
 			}
 			return buffer;
 		}
-		public async Task<byte[]> ReadBytesAsync(int count)
+		public async Task<byte[]> ReadBytesAsync(byte[] buffer, int count)
 		{
-			var buffer = new byte[count];
 			if (count > 0)
 			{
 				var toRead = count;
@@ -410,6 +371,7 @@ namespace FirebirdSql.Data.Client.Managed
 				}
 				if (toRead == count)
 				{
+					_ioFailed = true;
 					throw new IOException();
 				}
 			}
@@ -418,11 +380,13 @@ namespace FirebirdSql.Data.Client.Managed
 
 		public byte[] ReadOpaque(int length)
 		{
-			var buffer = ReadBytes(length);
+			var buffer = new byte[length];
+			ReadBytes(buffer, length);
 			var padLength = ((4 - length) & 3);
 			if (padLength > 0)
 			{
-				Read(Pad, 0, padLength);
+				var dummy = new byte[padLength];
+				Read(dummy, 0, padLength);
 			}
 			return buffer;
 		}
@@ -460,21 +424,27 @@ namespace FirebirdSql.Data.Client.Managed
 
 		public int ReadInt32()
 		{
-			return IPAddress.HostToNetworkOrder(BitConverter.ToInt32(ReadBytes(4), 0));
+			Array.Clear(_smallBuffer, 0, 4);
+			ReadBytes(_smallBuffer, 4);
+			return IPAddress.HostToNetworkOrder(BitConverter.ToInt32(_smallBuffer, 0));
 		}
 		public async Task<int> ReadInt32Async()
 		{
-			return IPAddress.HostToNetworkOrder(BitConverter.ToInt32(await ReadBytesAsync(4).ConfigureAwait(false), 0));
+			Array.Clear(_smallBuffer, 0, 4);
+			await ReadBytesAsync(_smallBuffer, 4).ConfigureAwait(false);
+			return IPAddress.HostToNetworkOrder(BitConverter.ToInt32(_smallBuffer, 0));
 		}
 
 		public long ReadInt64()
 		{
-			return IPAddress.HostToNetworkOrder(BitConverter.ToInt64(ReadBytes(8), 0));
+			Array.Clear(_smallBuffer, 0, 8);
+			ReadBytes(_smallBuffer, 8);
+			return IPAddress.HostToNetworkOrder(BitConverter.ToInt64(_smallBuffer, 0));
 		}
 
-		public Guid ReadGuid(int length)
+		public Guid ReadGuid()
 		{
-			return new Guid(ReadOpaque(length));
+			return TypeDecoder.DecodeGuid(ReadOpaque(16));
 		}
 
 		public float ReadSingle()
@@ -489,8 +459,8 @@ namespace FirebirdSql.Data.Client.Managed
 
 		public DateTime ReadDateTime()
 		{
-			DateTime date = ReadDate();
-			TimeSpan time = ReadTime();
+			var date = ReadDate();
+			var time = ReadTime();
 			return date.Add(time);
 		}
 
@@ -538,17 +508,17 @@ namespace FirebirdSql.Data.Client.Managed
 		public IscException ReadStatusVector()
 		{
 			IscException exception = null;
-			bool eof = false;
+			var eof = false;
 
 			while (!eof)
 			{
-				int arg = ReadInt32();
+				var arg = ReadInt32();
 
 				switch (arg)
 				{
 					case IscCodes.isc_arg_gds:
 					default:
-						int er = ReadInt32();
+						var er = ReadInt32();
 						if (er != 0)
 						{
 							if (exception == null)
@@ -596,8 +566,8 @@ namespace FirebirdSql.Data.Client.Managed
 			if (buffer != null && length > 0)
 			{
 				Write(buffer, 0, buffer.Length);
-				Write(Fill, 0, length - buffer.Length);
-				Write(Pad, 0, ((4 - length) & 3));
+				WriteFill(length - buffer.Length);
+				WritePad((4 - length) & 3);
 			}
 		}
 
@@ -612,7 +582,7 @@ namespace FirebirdSql.Data.Client.Managed
 			if (buffer != null && length > 0)
 			{
 				Write(buffer, 0, length);
-				Write(Pad, 0, ((4 - length) & 3));
+				WritePad((4 - length) & 3);
 			}
 		}
 
@@ -620,13 +590,13 @@ namespace FirebirdSql.Data.Client.Managed
 		{
 			var length = buffer.Length; // 2 for short for buffer length
 			if (length > short.MaxValue)
-				throw new IOException();
+				throw new IOException("Blob buffer too big.");
 			Write(length + 2);
 			Write(length + 2);  //bizarre but true! three copies of the length
 			WriteByte((byte)((length >> 0) & 0xff));
 			WriteByte((byte)((length >> 8) & 0xff));
 			Write(buffer, 0, length);
-			Write(Pad, 0, ((4 - length + 2) & 3));
+			WritePad((4 - length + 2) & 3);
 		}
 
 		public void WriteTyped(int type, byte[] buffer)
@@ -645,12 +615,12 @@ namespace FirebirdSql.Data.Client.Managed
 				WriteByte((byte)type);
 				Write(buffer, 0, buffer.Length);
 			}
-			Write(Pad, 0, ((4 - length) & 3));
+			WritePad((4 - length) & 3);
 		}
 
 		public void Write(string value)
 		{
-			byte[] buffer = _charset.GetBytes(value);
+			var buffer = _charset.GetBytes(value);
 			WriteBuffer(buffer, buffer.Length);
 		}
 
@@ -683,7 +653,7 @@ namespace FirebirdSql.Data.Client.Managed
 
 		public void Write(decimal value, int type, int scale)
 		{
-			object numeric = TypeEncoder.EncodeDecimal(value, scale, type);
+			var numeric = TypeEncoder.EncodeDecimal(value, scale, type);
 			switch (type & ~1)
 			{
 				case IscCodes.SQL_SHORT:
@@ -715,6 +685,11 @@ namespace FirebirdSql.Data.Client.Managed
 		{
 			WriteDate(value);
 			WriteTime(TypeHelper.DateTimeToTimeSpan(value));
+		}
+
+		public void Write(Guid value)
+		{
+			WriteOpaque(TypeEncoder.EncodeGuid(value));
 		}
 
 		public void WriteDate(DateTime value)
@@ -749,13 +724,66 @@ namespace FirebirdSql.Data.Client.Managed
 				throw new InvalidOperationException("Read operations are not allowed by this stream.");
 		}
 
-		#endregion
-
-		#region Private Properties
-
-		private bool ValidOperationAvailable
+		private int ReadFromInputBuffer(byte[] buffer, int offset, int count)
 		{
-			get { return _operation >= 0; }
+			var read = Math.Min(count, _inputBuffer.Count);
+			for (var i = 0; i < read; i++)
+			{
+				buffer[offset + i] = _inputBuffer.Dequeue();
+			}
+			return read;
+		}
+
+		private void WriteToInputBuffer(byte[] data, int count)
+		{
+			for (var i = 0; i < count; i++)
+			{
+				_inputBuffer.Enqueue(data[i]);
+			}
+		}
+
+		private int HandleDecompression(byte[] buffer, int count)
+		{
+			_inflate.OutputBuffer = _compressionBuffer;
+			_inflate.AvailableBytesOut = _compressionBuffer.Length;
+			_inflate.NextOut = 0;
+			_inflate.InputBuffer = buffer;
+			_inflate.AvailableBytesIn = count;
+			_inflate.NextIn = 0;
+			var rc = _inflate.Inflate(Ionic.Zlib.FlushType.None);
+			if (rc != Ionic.Zlib.ZlibConstants.Z_OK)
+				throw new IOException($"Error '{rc}' while decompressing the data.");
+			if (_inflate.AvailableBytesIn != 0)
+				throw new IOException("Decompression buffer too small.");
+			return _inflate.NextOut;
+		}
+
+		private int HandleCompression(byte[] buffer, int count)
+		{
+			_deflate.OutputBuffer = _compressionBuffer;
+			_deflate.AvailableBytesOut = _compressionBuffer.Length;
+			_deflate.NextOut = 0;
+			_deflate.InputBuffer = buffer;
+			_deflate.AvailableBytesIn = count;
+			_deflate.NextIn = 0;
+			var rc = _deflate.Deflate(Ionic.Zlib.FlushType.Sync);
+			if (rc != Ionic.Zlib.ZlibConstants.Z_OK)
+				throw new IOException($"Error '{rc}' while compressing the data.");
+			if (_deflate.AvailableBytesIn != 0)
+				throw new IOException("Compression buffer too small.");
+			return _deflate.NextOut;
+		}
+
+		private readonly static byte[] PadArray = new byte[] { 0, 0, 0, 0 };
+		private void WritePad(int length)
+		{
+			Write(PadArray, 0, length);
+		}
+
+		private readonly static byte[] FillArray = Enumerable.Repeat((byte)32, 32767).ToArray();
+		private void WriteFill(int length)
+		{
+			Write(FillArray, 0, length);
 		}
 
 		#endregion

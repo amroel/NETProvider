@@ -1,21 +1,19 @@
-/*
- *	Firebird ADO.NET Data provider for .NET and Mono
+﻿/*
+ *    The contents of this file are subject to the Initial
+ *    Developer's Public License Version 1.0 (the "License");
+ *    you may not use this file except in compliance with the
+ *    License. You may obtain a copy of the License at
+ *    https://github.com/FirebirdSQL/NETProvider/blob/master/license.txt.
  *
- *	   The contents of this file are subject to the Initial
- *	   Developer's Public License Version 1.0 (the "License");
- *	   you may not use this file except in compliance with the
- *	   License. You may obtain a copy of the License at
- *	   http://www.firebirdsql.org/index.php?op=doc&id=idpl
+ *    Software distributed under the License is distributed on
+ *    an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
+ *    express or implied. See the License for the specific
+ *    language governing rights and limitations under the License.
  *
- *	   Software distributed under the License is distributed on
- *	   an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
- *	   express or implied. See the License for the specific
- *	   language governing rights and limitations under the License.
- *
- *	Copyright (c) 2002 - 2007 Carlos Guzman Alvarez
- *	Copyright (c) 2007 - 2017 Jiri Cincura (jiri@cincura.net)
- *	All Rights Reserved.
+ *    All Rights Reserved.
  */
+
+//$Authors = Carlos Guzman Alvarez, Jiri Cincura (jiri@cincura.net)
 
 using System;
 using System.Collections.Generic;
@@ -285,7 +283,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 					ProcessStoredProcedureExecuteResponse(_database.ReadSqlResponse());
 				}
 
-				GenericResponse executeResponse = _database.ReadGenericResponse();
+				var executeResponse = _database.ReadGenericResponse();
 				ProcessExecuteResponse(executeResponse);
 
 				if (ReturnRecordsAffected &&
@@ -314,8 +312,16 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 			{
 				throw new InvalidOperationException("Statement is not correctly created.");
 			}
-			if (_statementType != DbStatementType.Select &&
-				_statementType != DbStatementType.SelectForUpdate)
+			if (_statementType == DbStatementType.StoredProcedure && !_allRowsFetched)
+			{
+				_allRowsFetched = true;
+				return GetOutputParameters();
+			}
+			else if (_statementType == DbStatementType.Insert && _allRowsFetched)
+			{
+				return null;
+			}
+			else if (_statementType != DbStatementType.Select && _statementType != DbStatementType.SelectForUpdate)
 			{
 				return null;
 			}
@@ -339,10 +345,8 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 						{
 							response = _database.ReadResponse();
 
-							if (response is FetchResponse)
+							if (response is FetchResponse fetchResponse)
 							{
-								FetchResponse fetchResponse = (FetchResponse)response;
-
 								if (fetchResponse.Count > 0 && fetchResponse.Status == 0)
 								{
 									_rows.Enqueue(ReadRow());
@@ -423,7 +427,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 		protected void ProcessPrepareResponse(GenericResponse response)
 		{
-			Descriptor[] descriptors = new Descriptor[] { null, null };
+			var descriptors = new Descriptor[] { null, null };
 			ParseSqlInfo(response.Data, DescribeInfoAndBindInfoItems, ref descriptors);
 			_fields = descriptors[0];
 			_parameters = descriptors[1];
@@ -473,7 +477,6 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 				return;
 
 			DoFreePacket(option);
-			_database.XdrStream.Flush();
 			ProcessFreeResponse(_database.ReadResponse());
 		}
 
@@ -495,7 +498,10 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 		{
 			try
 			{
-				SendFreeToBuffer(option);
+				_database.XdrStream.Write(IscCodes.op_free_statement);
+				_database.XdrStream.Write(_handle);
+				_database.XdrStream.Write(option);
+				_database.XdrStream.Flush();
 
 				if (option == IscCodes.DSQL_drop)
 				{
@@ -510,13 +516,6 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 				_state = StatementState.Error;
 				throw IscException.ForErrorCode(IscCodes.isc_net_read_err, ex);
 			}
-		}
-
-		protected void SendFreeToBuffer(int option)
-		{
-			_database.XdrStream.Write(IscCodes.op_free_statement);
-			_database.XdrStream.Write(_handle);
-			_database.XdrStream.Write(option);
 		}
 
 		protected void ProcessFreeResponse(IResponse response)
@@ -575,7 +574,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 			if (_statementType == DbStatementType.StoredProcedure)
 			{
-				_database.XdrStream.WriteBuffer(_fields == null ? null : _fields.ToBlrArray());
+				_database.XdrStream.WriteBuffer(_fields?.ToBlrArray());
 				_database.XdrStream.Write(0); // Output message number
 			}
 		}
@@ -620,9 +619,9 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 		protected void ParseTruncSqlInfo(byte[] info, byte[] items, ref Descriptor[] rowDescs)
 		{
-			int currentPosition = 0;
-			int currentDescriptorIndex = -1;
-			int currentItemIndex = 0;
+			var currentPosition = 0;
+			var currentDescriptorIndex = -1;
+			var currentItemIndex = 0;
 			while (info[currentPosition] != IscCodes.isc_info_end)
 			{
 				byte item;
@@ -633,17 +632,17 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 						case IscCodes.isc_info_truncated:
 							currentItemIndex--;
 
-							List<byte> newItems = new List<byte>(items.Length);
-							int part = 0;
-							int chock = 0;
-							for (int i = 0; i < items.Length; i++)
+							var newItems = new List<byte>(items.Length);
+							var part = 0;
+							var chock = 0;
+							for (var i = 0; i < items.Length; i++)
 							{
 								if (items[i] == IscCodes.isc_info_sql_describe_end)
 								{
 									newItems.Insert(chock, IscCodes.isc_info_sql_sqlda_start);
 									newItems.Insert(chock + 1, 2);
 
-									short processedItems = (rowDescs[part] != null ? rowDescs[part].Count : (short)0);
+									var processedItems = (rowDescs[part] != null ? rowDescs[part].Count : (short)0);
 									newItems.Insert(chock + 2, (byte)((part == currentDescriptorIndex ? currentItemIndex : processedItems) & 255));
 									newItems.Insert(chock + 3, (byte)((part == currentDescriptorIndex ? currentItemIndex : processedItems) >> 8));
 
@@ -667,11 +666,11 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 								break;
 
 							currentPosition++;
-							int len = IscHelper.VaxInteger(info, currentPosition, 2);
+							var len = IscHelper.VaxInteger(info, currentPosition, 2);
 							currentPosition += 2;
 							if (rowDescs[currentDescriptorIndex] == null)
 							{
-								int n = IscHelper.VaxInteger(info, currentPosition, len);
+								var n = IscHelper.VaxInteger(info, currentPosition, len);
 								rowDescs[currentDescriptorIndex] = new Descriptor((short)n);
 								if (n == 0)
 								{
@@ -826,7 +825,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 						break;
 
 					case DbDataType.Guid:
-						xdr.WriteOpaque(field.DbValue.GetGuid().ToByteArray());
+						xdr.Write(field.DbValue.GetGuid());
 						break;
 
 					case DbDataType.Double:
@@ -847,7 +846,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 						break;
 
 					case DbDataType.Boolean:
-						xdr.Write(Convert.ToBoolean(field.Value));
+						xdr.Write(field.DbValue.GetBoolean());
 						break;
 
 					default:
@@ -911,7 +910,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 					return _database.XdrStream.ReadSingle();
 
 				case DbDataType.Guid:
-					return _database.XdrStream.ReadGuid(field.Length);
+					return _database.XdrStream.ReadGuid();
 
 				case DbDataType.Double:
 					return _database.XdrStream.ReadDouble();
@@ -982,10 +981,10 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 		protected virtual DbValue[] ReadRow()
 		{
-			DbValue[] row = new DbValue[_fields.Count];
+			var row = new DbValue[_fields.Count];
 			try
 			{
-				for (int i = 0; i < _fields.Count; i++)
+				for (var i = 0; i < _fields.Count; i++)
 				{
 					var value = ReadRawValue(_fields[i]);
 					var sqlInd = _database.XdrStream.ReadInt32();

@@ -1,24 +1,21 @@
 ﻿/*
- *	Firebird ADO.NET Data provider for .NET and Mono
+ *    The contents of this file are subject to the Initial
+ *    Developer's Public License Version 1.0 (the "License");
+ *    you may not use this file except in compliance with the
+ *    License. You may obtain a copy of the License at
+ *    https://github.com/FirebirdSQL/NETProvider/blob/master/license.txt.
  *
- *	   The contents of this file are subject to the Initial
- *	   Developer's Public License Version 1.0 (the "License");
- *	   you may not use this file except in compliance with the
- *	   License. You may obtain a copy of the License at
- *	   http://www.firebirdsql.org/index.php?op=doc&id=idpl
+ *    Software distributed under the License is distributed on
+ *    an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
+ *    express or implied. See the License for the specific
+ *    language governing rights and limitations under the License.
  *
- *	   Software distributed under the License is distributed on
- *	   an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
- *	   express or implied. See the License for the specific
- *	   language governing rights and limitations under the License.
- *
- *	Copyright (c) 2002 - 2007 Carlos Guzman Alvarez
- *	Copyright (c) 2007 - 2017 Jiri Cincura (jiri@cincura.net)
- *	All Rights Reserved.
+ *    All Rights Reserved.
  */
 
+//$Authors = Carlos Guzman Alvarez, Jiri Cincura (jiri@cincura.net)
+
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Data;
 using System.Globalization;
@@ -41,7 +38,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 		#region Callbacks
 
-		public WarningMessageCallback WarningMessage
+		public Action<IscException> WarningMessage
 		{
 			get { return _warningMessage; }
 			set { _warningMessage = value; }
@@ -51,7 +48,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 		#region Fields
 
-		protected WarningMessageCallback _warningMessage;
+		protected Action<IscException> _warningMessage;
 
 		private GdsConnection _connection;
 		private GdsEventManager _eventManager;
@@ -124,6 +121,10 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 			get { return _connection.AuthData; }
 		}
 
+		public bool ConnectionBroken
+		{
+			get { return _xdrStream.IOFailed; }
+		}
 
 		#endregion
 
@@ -274,7 +275,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 		#region Database Methods
 
-		public virtual void CreateDatabase(DatabaseParameterBuffer dpb, string dataSource, int port, string database)
+		public virtual void CreateDatabase(DatabaseParameterBuffer dpb, string dataSource, int port, string database, byte[] cryptKey)
 		{
 			try
 			{
@@ -367,26 +368,26 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 				auxHandle = XdrStream.ReadInt32();
 
-				// garbage
-				XdrStream.ReadBytes(8);
+				var garbage1 = new byte[8];
+				XdrStream.ReadBytes(garbage1, 8);
 
-				int respLen = XdrStream.ReadInt32();
+				var respLen = XdrStream.ReadInt32();
 				respLen += respLen % 4;
 
-				// sin_family
-				XdrStream.ReadBytes(2);
+				var sin_family = new byte[2];
+				XdrStream.ReadBytes(sin_family, 2);
 				respLen -= 2;
 
-				// sin_port
-				byte[] buffer = XdrStream.ReadBytes(2);
-				portNumber = (ushort)IPAddress.NetworkToHostOrder(BitConverter.ToInt16(buffer, 0));
+				var sin_port = new byte[2];
+				XdrStream.ReadBytes(sin_port, 2);
+				portNumber = (ushort)IPAddress.NetworkToHostOrder(BitConverter.ToInt16(sin_port, 0));
 				respLen -= 2;
 
 				// * The address returned by the server may be incorrect if it is behind a NAT box
 				// * so we must use the address that was used to connect the main socket, not the
 				// * address reported by the server.
-				// sin_addr
-				buffer = XdrStream.ReadBytes(4);
+				var sin_addr = new byte[4];
+				XdrStream.ReadBytes(sin_addr, 4);
 				//ipAddress = string.Format(
 				//    CultureInfo.InvariantCulture,
 				//    "{0}.{1}.{2}.{3}",
@@ -394,8 +395,8 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 				ipAddress = _connection.IPAddress.ToString();
 				respLen -= 4;
 
-				// garbage
-				XdrStream.ReadBytes(respLen);
+				var garbage2 = new byte[respLen];
+				XdrStream.ReadBytes(garbage2, respLen);
 
 				XdrStream.ReadStatusVector();
 			}
@@ -440,8 +441,8 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 				remoteEvent.LocalId++;
 
-				EventParameterBuffer epb = remoteEvent.BuildEpb();
-				byte[] epbData = epb.ToArray();
+				var epb = remoteEvent.BuildEpb();
+				var epbData = epb.ToArray();
 
 				XdrStream.Write(IscCodes.op_que_events);
 				XdrStream.Write(_handle);
@@ -452,7 +453,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 				XdrStream.Flush();
 
-				GenericResponse response = (GenericResponse)ReadResponse();
+				var response = (GenericResponse)ReadResponse();
 
 				remoteEvent.RemoteId = response.ObjectHandle;
 			}
@@ -486,7 +487,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 		public virtual TransactionBase BeginTransaction(TransactionParameterBuffer tpb)
 		{
-			GdsTransaction transaction = new GdsTransaction(this);
+			var transaction = new GdsTransaction(this);
 
 			transaction.BeginTransaction(tpb);
 
@@ -531,12 +532,12 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 			return (string)info[info.Count - 1];
 		}
 
-		public virtual ArrayList GetDatabaseInfo(byte[] items)
+		public virtual List<object> GetDatabaseInfo(byte[] items)
 		{
 			return GetDatabaseInfo(items, IscCodes.DEFAULT_MAX_BUFFER_SIZE);
 		}
 
-		public virtual ArrayList GetDatabaseInfo(byte[] items, int bufferLength)
+		public virtual List<object> GetDatabaseInfo(byte[] items, int bufferLength)
 		{
 			var buffer = new byte[bufferLength];
 			DatabaseInfo(items, buffer, buffer.Length);
@@ -549,22 +550,22 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 		protected void ProcessResponse(IResponse response)
 		{
-			if (response != null && response is GenericResponse)
+			if (response is GenericResponse genericResponse)
 			{
-				if (((GenericResponse)response).Exception != null && !((GenericResponse)response).Exception.IsWarning)
+				if (genericResponse.Exception != null && !genericResponse.Exception.IsWarning)
 				{
-					throw ((GenericResponse)response).Exception;
+					throw genericResponse.Exception;
 				}
 			}
 		}
 
 		protected void ProcessResponseWarnings(IResponse response)
 		{
-			if (response is GenericResponse)
+			if (response is GenericResponse genericResponse)
 			{
-				if (((GenericResponse)response).Exception != null && ((GenericResponse)response).Exception.IsWarning)
+				if (genericResponse.Exception != null && genericResponse.Exception.IsWarning)
 				{
-					_warningMessage?.Invoke(((GenericResponse)response).Exception);
+					_warningMessage?.Invoke(genericResponse.Exception);
 				}
 			}
 		}
@@ -585,7 +586,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 		public virtual IResponse ReadResponse()
 		{
-			IResponse response = ReadSingleResponse();
+			var response = ReadSingleResponse();
 
 			if (response is GenericResponse)
 			{
@@ -630,9 +631,9 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 		protected virtual IResponse ReadSingleResponse()
 		{
-			int operation = ReadOperation();
+			var operation = ReadOperation();
 
-			IResponse response = GdsConnection.ProcessOperation(operation, XdrStream);
+			var response = GdsConnection.ProcessOperation(operation, XdrStream);
 
 			ProcessResponseWarnings(response);
 
@@ -651,9 +652,9 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 				XdrStream.Flush();
 
-				GenericResponse response = (GenericResponse)ReadResponse();
+				var response = (GenericResponse)ReadResponse();
 
-				int responseLength = bufferLength;
+				var responseLength = bufferLength;
 
 				if (response.Data.Length < bufferLength)
 				{

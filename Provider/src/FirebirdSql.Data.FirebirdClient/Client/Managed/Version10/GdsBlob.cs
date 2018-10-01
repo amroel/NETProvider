@@ -1,23 +1,19 @@
 ﻿/*
- *	Firebird ADO.NET Data provider for .NET and Mono
+ *    The contents of this file are subject to the Initial
+ *    Developer's Public License Version 1.0 (the "License");
+ *    you may not use this file except in compliance with the
+ *    License. You may obtain a copy of the License at
+ *    https://github.com/FirebirdSQL/NETProvider/blob/master/license.txt.
  *
- *	   The contents of this file are subject to the Initial
- *	   Developer's Public License Version 1.0 (the "License");
- *	   you may not use this file except in compliance with the
- *	   License. You may obtain a copy of the License at
- *	   http://www.firebirdsql.org/index.php?op=doc&id=idpl
+ *    Software distributed under the License is distributed on
+ *    an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
+ *    express or implied. See the License for the specific
+ *    language governing rights and limitations under the License.
  *
- *	   Software distributed under the License is distributed on
- *	   an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
- *	   express or implied. See the License for the specific
- *	   language governing rights and limitations under the License.
- *
- *	Copyright (c) 2002, 2007 Carlos Guzman Alvarez
- *	All Rights Reserved.
- *
- *  Contributors:
- *      Jiri Cincura (jiri@cincura.net)
+ *    All Rights Reserved.
  */
+
+//$Authors = Carlos Guzman Alvarez, Jiri Cincura (jiri@cincura.net)
 
 using System;
 using System.IO;
@@ -109,17 +105,17 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 		protected override byte[] GetSegment()
 		{
-			int requested = SegmentSize;
+			var requested = SegmentSize;
 
 			try
 			{
 				_database.XdrStream.Write(IscCodes.op_get_segment);
 				_database.XdrStream.Write(_blobHandle);
-				_database.XdrStream.Write((requested + 2 < short.MaxValue) ? requested + 2 : short.MaxValue);
+				_database.XdrStream.Write(requested < short.MaxValue - 12 ? requested : short.MaxValue - 12);
 				_database.XdrStream.Write(DataSegment);
 				_database.XdrStream.Flush();
 
-				GenericResponse response = _database.ReadGenericResponse();
+				var response = _database.ReadGenericResponse();
 
 				RblRemoveValue(IscCodes.RBL_segment);
 				if (response.ObjectHandle == 1)
@@ -131,7 +127,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 					RblAddValue(IscCodes.RBL_eof_pending);
 				}
 
-				byte[] buffer = response.Data;
+				var buffer = response.Data;
 
 				if (buffer.Length == 0)
 				{
@@ -139,9 +135,9 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 					return buffer;
 				}
 
-				int len = 0;
-				int srcpos = 0;
-				int destpos = 0;
+				var len = 0;
+				var srcpos = 0;
+				var destpos = 0;
 
 				while (srcpos < buffer.Length)
 				{
@@ -153,7 +149,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 					destpos += len;
 				}
 
-				byte[] result = new byte[destpos];
+				var result = new byte[destpos];
 				Buffer.BlockCopy(buffer, 0, result, 0, destpos);
 
 				return result;
@@ -191,7 +187,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 				_database.XdrStream.Write(position);
 				_database.XdrStream.Flush();
 
-				GenericResponse response = (GenericResponse)_database.ReadResponse();
+				var response = (GenericResponse)_database.ReadResponse();
 
 				_position = response.ObjectHandle;
 			}
@@ -233,7 +229,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 				_database.XdrStream.Write(_blobId);
 				_database.XdrStream.Flush();
 
-				GenericResponse response = _database.ReadGenericResponse();
+				var response = _database.ReadGenericResponse();
 
 				_blobId = response.BlobId;
 				_blobHandle = response.ObjectHandle;

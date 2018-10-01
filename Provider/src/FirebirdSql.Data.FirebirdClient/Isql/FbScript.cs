@@ -1,21 +1,19 @@
-/*
- *  Firebird ADO.NET Data provider for .NET and Mono
+﻿/*
+ *    The contents of this file are subject to the Initial
+ *    Developer's Public License Version 1.0 (the "License");
+ *    you may not use this file except in compliance with the
+ *    License. You may obtain a copy of the License at
+ *    https://github.com/FirebirdSQL/NETProvider/blob/master/license.txt.
  *
- *     The contents of this file are subject to the Initial
- *     Developer's Public License Version 1.0 (the "License");
- *     you may not use this file except in compliance with the
- *     License. You may obtain a copy of the License at
- *     http://www.firebirdsql.org/index.php?op=doc&id=idpl
+ *    Software distributed under the License is distributed on
+ *    an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
+ *    express or implied. See the License for the specific
+ *    language governing rights and limitations under the License.
  *
- *     Software distributed under the License is distributed on
- *     an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
- *     express or implied.  See the License for the specific
- *     language governing rights and limitations under the License.
- *
- *  Copyright (c) 2003, 2005 Abel Eduardo Pereira
- *  Copyright (c) 2015 Jiri Cincura (jiri@cincura.net)
- *  All Rights Reserved.
+ *    All Rights Reserved.
  */
+
+//$Authors = Abel Eduardo Pereira, Jiri Cincura (jiri@cincura.net)
 
 using System;
 using System.IO;
@@ -124,7 +122,7 @@ namespace FirebirdSql.Data.Isql
 				return true;
 			}
 
-			newTerm = default(string);
+			newTerm = default;
 			return false;
 		}
 
@@ -157,6 +155,10 @@ namespace FirebirdSql.Data.Isql
 					if (sqlStatement.StartsWith("ALTER INDEX", StringComparison.OrdinalIgnoreCase))
 					{
 						return SqlStatementType.AlterIndex;
+					}
+					if (sqlStatement.StartsWith("ALTER PACKAGE", StringComparison.OrdinalIgnoreCase))
+					{
+						return SqlStatementType.AlterPackage;
 					}
 					if (sqlStatement.StartsWith("ALTER PROCEDURE", StringComparison.OrdinalIgnoreCase))
 					{
@@ -235,6 +237,15 @@ namespace FirebirdSql.Data.Isql
 						sqlStatement.StartsWith("CREATE DESCENDING INDEX", StringComparison.OrdinalIgnoreCase))
 					{
 						return SqlStatementType.CreateIndex;
+					}
+					if (sqlStatement.StartsWith("CREATE PACKAGE BODY", StringComparison.OrdinalIgnoreCase))
+					{
+						return SqlStatementType.CreatePackageBody;
+					}
+					if (sqlStatement.StartsWith("CREATE PACKAGE", StringComparison.OrdinalIgnoreCase) ||
+						sqlStatement.StartsWith("CREATE OR ALTER PACKAGE", StringComparison.OrdinalIgnoreCase))
+					{
+						return SqlStatementType.CreatePackage;
 					}
 					if (sqlStatement.StartsWith("CREATE PROCEDURE", StringComparison.OrdinalIgnoreCase) ||
 						sqlStatement.StartsWith("CREATE OR ALTER PROCEDURE", StringComparison.OrdinalIgnoreCase))
@@ -348,6 +359,14 @@ namespace FirebirdSql.Data.Isql
 					{
 						return SqlStatementType.DropIndex;
 					}
+					if (sqlStatement.StartsWith("DROP PACKAGE BODY", StringComparison.OrdinalIgnoreCase))
+					{
+						return SqlStatementType.DropPackageBody;
+					}
+					if (sqlStatement.StartsWith("DROP PACKAGE", StringComparison.OrdinalIgnoreCase))
+					{
+						return SqlStatementType.DropPackage;
+					}
 					if (sqlStatement.StartsWith("DROP PROCEDURE", StringComparison.OrdinalIgnoreCase))
 					{
 						return SqlStatementType.DropProcedure;
@@ -438,6 +457,14 @@ namespace FirebirdSql.Data.Isql
 					}
 					break;
 
+				case 'M':
+				case 'm':
+					if (sqlStatement.StartsWith("MERGE", StringComparison.OrdinalIgnoreCase))
+					{
+						return SqlStatementType.Merge;
+					}
+					break;
+
 				case 'O':
 				case 'o':
 					if (sqlStatement.StartsWith("OPEN", StringComparison.OrdinalIgnoreCase))
@@ -463,6 +490,14 @@ namespace FirebirdSql.Data.Isql
 					if (sqlStatement.StartsWith("RECREATE FUNCTION", StringComparison.OrdinalIgnoreCase))
 					{
 						return SqlStatementType.RecreateFunction;
+					}
+					if (sqlStatement.StartsWith("RECREATE PACKAGE BODY", StringComparison.OrdinalIgnoreCase))
+					{
+						return SqlStatementType.RecreatePackageBody;
+					}
+					if (sqlStatement.StartsWith("RECREATE PACKAGE", StringComparison.OrdinalIgnoreCase))
+					{
+						return SqlStatementType.RecreatePackage;
 					}
 					if (sqlStatement.StartsWith("RECREATE PROCEDURE", StringComparison.OrdinalIgnoreCase))
 					{

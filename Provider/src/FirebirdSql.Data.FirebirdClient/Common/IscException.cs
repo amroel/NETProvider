@@ -1,26 +1,21 @@
 ﻿/*
- *	Firebird ADO.NET Data provider for .NET and Mono
+ *    The contents of this file are subject to the Initial
+ *    Developer's Public License Version 1.0 (the "License");
+ *    you may not use this file except in compliance with the
+ *    License. You may obtain a copy of the License at
+ *    https://github.com/FirebirdSQL/NETProvider/blob/master/license.txt.
  *
- *	   The contents of this file are subject to the Initial
- *	   Developer's Public License Version 1.0 (the "License");
- *	   you may not use this file except in compliance with the
- *	   License. You may obtain a copy of the License at
- *	   http://www.firebirdsql.org/index.php?op=doc&id=idpl
+ *    Software distributed under the License is distributed on
+ *    an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
+ *    express or implied. See the License for the specific
+ *    language governing rights and limitations under the License.
  *
- *	   Software distributed under the License is distributed on
- *	   an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
- *	   express or implied. See the License for the specific
- *	   language governing rights and limitations under the License.
- *
- *	Copyright (c) 2002, 2007 Carlos Guzman Alvarez
- *	All Rights Reserved.
- *
- * Contributors:
- *   Jiri Cincura (jiri@cincura.net)
+ *    All Rights Reserved.
  */
 
+//$Authors = Carlos Guzman Alvarez, Jiri Cincura (jiri@cincura.net)
+
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
@@ -66,7 +61,7 @@ namespace FirebirdSql.Data.Common
 		public static IscException ForErrorCodes(IEnumerable<int> errorCodes, Exception innerException = null)
 		{
 			var result = new IscException(innerException);
-			foreach (int errorCode in errorCodes)
+			foreach (var errorCode in errorCodes)
 			{
 				result.Errors.Add(new IscError(IscCodes.isc_arg_gds, errorCode));
 			}
@@ -152,7 +147,7 @@ namespace FirebirdSql.Data.Common
 
 		private void BuildSqlState()
 		{
-			IscError error = Errors.Find(e => e.Type == IscCodes.isc_arg_sql_state);
+			var error = Errors.Find(e => e.Type == IscCodes.isc_arg_sql_state);
 			// step #1, maybe we already have a SQLSTATE stuffed in the status vector
 			if (error != null)
 			{
@@ -167,17 +162,17 @@ namespace FirebirdSql.Data.Common
 
 		private void BuildExceptionMessage()
 		{
-			StringBuilder builder = new StringBuilder();
+			var builder = new StringBuilder();
 
-			for (int i = 0; i < Errors.Count; i++)
+			for (var i = 0; i < Errors.Count; i++)
 			{
 				if (Errors[i].Type == IscCodes.isc_arg_gds || Errors[i].Type == IscCodes.isc_arg_warning)
 				{
-					int code = Errors[i].ErrorCode;
-					string message = GetValueOrDefault(IscErrorMessages.Values, code, BuildDefaultErrorMessage);
+					var code = Errors[i].ErrorCode;
+					var message = GetValueOrDefault(IscErrorMessages.Values, code, BuildDefaultErrorMessage);
 
-					List<string> args = new List<string>();
-					int index = i + 1;
+					var args = new List<string>();
+					var index = i + 1;
 					while (index < Errors.Count && Errors[index].IsArgument)
 					{
 						args.Add(Errors[index++].StrParam);
@@ -215,7 +210,7 @@ namespace FirebirdSql.Data.Common
 			}
 
 			// Update error	collection only	with the main error
-			IscError mainError = new IscError(ErrorCode);
+			var mainError = new IscError(ErrorCode);
 			mainError.Message = builder.ToString();
 
 			Errors.Add(mainError);

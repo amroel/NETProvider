@@ -1,21 +1,19 @@
 ﻿/*
- *	Firebird ADO.NET Data provider for .NET and Mono
+ *    The contents of this file are subject to the Initial
+ *    Developer's Public License Version 1.0 (the "License");
+ *    you may not use this file except in compliance with the
+ *    License. You may obtain a copy of the License at
+ *    https://github.com/FirebirdSQL/NETProvider/blob/master/license.txt.
  *
- *	   The contents of this file are subject to the Initial
- *	   Developer's Public License Version 1.0 (the "License");
- *	   you may not use this file except in compliance with the
- *	   License. You may obtain a copy of the License at
- *	   http://www.firebirdsql.org/index.php?op=doc&id=idpl
+ *    Software distributed under the License is distributed on
+ *    an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
+ *    express or implied. See the License for the specific
+ *    language governing rights and limitations under the License.
  *
- *	   Software distributed under the License is distributed on
- *	   an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
- *	   express or implied. See the License for the specific
- *	   language governing rights and limitations under the License.
- *
- *	Copyright (c) 2002 - 2007 Carlos Guzman Alvarez
- *	Copyright (c) 2007 - 2017 Jiri Cincura (jiri@cincura.net)
- *	All Rights Reserved.
+ *    All Rights Reserved.
  */
+
+//$Authors = Carlos Guzman Alvarez, Jiri Cincura (jiri@cincura.net)
 
 using System;
 using System.IO;
@@ -29,14 +27,13 @@ using FirebirdSql.Data.Common;
 
 namespace FirebirdSql.Data.Client.Managed
 {
-	internal class GdsConnection
+	internal sealed class GdsConnection
 	{
 		const ulong KeepAliveTime = 1800000; // 30min
 		const ulong KeepAliveInterval = 1800000; // 30min
 
 		#region Fields
 
-		private Socket _socket;
 		private NetworkStream _networkStream;
 		private string _userID;
 		private string _password;
@@ -108,23 +105,22 @@ namespace FirebirdSql.Data.Client.Managed
 
 		#region Methods
 
-		public virtual void Connect()
+		public void Connect()
 		{
 			try
 			{
 				IPAddress = GetIPAddress(_dataSource, AddressFamily.InterNetwork);
 				var endPoint = new IPEndPoint(IPAddress, _portNumber);
 
-				_socket = new Socket(IPAddress.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+				var socket = new Socket(IPAddress.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+				socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReceiveBuffer, _packetSize);
+				socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.SendBuffer, _packetSize);
+				socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, 1);
+				socket.TrySetKeepAlive(KeepAliveTime, KeepAliveInterval);
+				socket.TryEnableLoopbackFastPath();
+				socket.Connect(endPoint);
 
-				_socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReceiveBuffer, _packetSize);
-				_socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.SendBuffer, _packetSize);
-				_socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, 1);
-				_socket.TrySetKeepAlive(KeepAliveTime, KeepAliveInterval);
-				_socket.TryEnableLoopbackFastPath();
-
-				_socket.Connect(endPoint);
-				_networkStream = new NetworkStream(_socket, false);
+				_networkStream = new NetworkStream(socket, true);
 			}
 			catch (SocketException ex)
 			{
@@ -132,9 +128,9 @@ namespace FirebirdSql.Data.Client.Managed
 			}
 		}
 
-		public virtual void Identify(string database)
+		public void Identify(string database)
 		{
-			using (var xdrStream = CreateXdrStream(false))
+			using (var xdrStream = CreateXdrStreamImpl(false))
 			{
 				try
 				{
@@ -197,7 +193,7 @@ namespace FirebirdSql.Data.Client.Managed
 										_authData = _sspi.GetClientSecurity(data);
 										break;
 									default:
-										throw new ArgumentOutOfRangeException();
+										throw new ArgumentOutOfRangeException(nameof(acceptPluginName), $"{nameof(acceptPluginName)}={acceptPluginName}");
 								}
 							}
 						}
@@ -237,15 +233,13 @@ namespace FirebirdSql.Data.Client.Managed
 
 		public XdrStream CreateXdrStream()
 		{
-			return CreateXdrStream(_compression);
+			return CreateXdrStreamImpl(_compression);
 		}
 
-		public virtual void Disconnect()
+		public void Disconnect()
 		{
 			_networkStream?.Dispose();
 			_networkStream = null;
-			_socket?.Dispose();
-			_socket = null;
 		}
 
 		#endregion
@@ -254,21 +248,19 @@ namespace FirebirdSql.Data.Client.Managed
 
 		private IPAddress GetIPAddress(string dataSource, AddressFamily addressFamily)
 		{
-			IPAddress ipaddress = null;
-
-			if (IPAddress.TryParse(dataSource, out ipaddress))
+			if (IPAddress.TryParse(dataSource, out var ipaddress))
 			{
 				return ipaddress;
 			}
 
 #if NETSTANDARD1_6
-			IPAddress[] addresses = Dns.GetHostEntryAsync(dataSource).GetAwaiter().GetResult().AddressList;
+			var addresses = Dns.GetHostEntryAsync(dataSource).GetAwaiter().GetResult().AddressList;
 #else
-			IPAddress[] addresses = Dns.GetHostEntry(dataSource).AddressList;
+			var addresses = Dns.GetHostEntry(dataSource).AddressList;
 #endif
 
 			// try to avoid problems with IPv6 addresses
-			foreach (IPAddress address in addresses)
+			foreach (var address in addresses)
 			{
 				if (address.AddressFamily == addressFamily)
 				{
@@ -341,7 +333,7 @@ namespace FirebirdSql.Data.Client.Managed
 			}
 		}
 
-		private XdrStream CreateXdrStream(bool compression)
+		private XdrStream CreateXdrStreamImpl(bool compression)
 		{
 			return new XdrStream(_networkStream, _characterSet, compression, false);
 		}
@@ -371,10 +363,10 @@ namespace FirebirdSql.Data.Client.Managed
 					return new AuthResponse(xdr.ReadBuffer());
 
 				case IscCodes.op_crypt_key_callback:
-					return new CryptKeyCallbackReponse(xdr.ReadBuffer());
+					return new CryptKeyCallbackResponse(xdr.ReadBuffer());
 
 				default:
-					return null;
+					throw new ArgumentOutOfRangeException(nameof(operation), $"{nameof(operation)}={operation}");
 			}
 		}
 
@@ -382,7 +374,7 @@ namespace FirebirdSql.Data.Client.Managed
 		{
 			const int MaxLength = 255 - 1;
 			var part = 0;
-			for (int i = 0; i < data.Length; i += MaxLength)
+			for (var i = 0; i < data.Length; i += MaxLength)
 			{
 				stream.WriteByte(code);
 				var length = Math.Min(data.Length - i, MaxLength);

@@ -1,23 +1,19 @@
 ﻿/*
- *	Firebird ADO.NET Data provider for .NET and Mono
+ *    The contents of this file are subject to the Initial
+ *    Developer's Public License Version 1.0 (the "License");
+ *    you may not use this file except in compliance with the
+ *    License. You may obtain a copy of the License at
+ *    https://github.com/FirebirdSQL/NETProvider/blob/master/license.txt.
  *
- *	   The contents of this file are subject to the Initial
- *	   Developer's Public License Version 1.0 (the "License");
- *	   you may not use this file except in compliance with the
- *	   License. You may obtain a copy of the License at
- *	   http://www.firebirdsql.org/index.php?op=doc&id=idpl
+ *    Software distributed under the License is distributed on
+ *    an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
+ *    express or implied. See the License for the specific
+ *    language governing rights and limitations under the License.
  *
- *	   Software distributed under the License is distributed on
- *	   an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
- *	   express or implied. See the License for the specific
- *	   language governing rights and limitations under the License.
- *
- *	Copyright (c) 2002, 2007 Carlos Guzman Alvarez
- *	All Rights Reserved.
- *
- *  Contributors:
- *    Jiri Cincura (jiri@cincura.net)
+ *    All Rights Reserved.
  */
+
+//$Authors = Carlos Guzman Alvarez, Jiri Cincura (jiri@cincura.net)
 
 using System;
 using System.Text;
@@ -111,9 +107,9 @@ namespace FirebirdSql.Data.Common
 
 		public string GetExecutionPlan()
 		{
-			int count = 0;
-			int bufferSize = IscCodes.DEFAULT_MAX_BUFFER_SIZE;
-			byte[] buffer = GetSqlInfo(DescribePlanInfoItems, bufferSize);
+			var count = 0;
+			var bufferSize = IscCodes.DEFAULT_MAX_BUFFER_SIZE;
+			var buffer = GetSqlInfo(DescribePlanInfoItems, bufferSize);
 
 			if (buffer[0] == IscCodes.isc_info_end)
 			{
@@ -221,20 +217,20 @@ namespace FirebirdSql.Data.Common
 
 		protected int GetRecordsAffected()
 		{
-			byte[] buffer = GetSqlInfo(RowsAffectedInfoItems, IscCodes.ROWS_AFFECTED_BUFFER_SIZE);
+			var buffer = GetSqlInfo(RowsAffectedInfoItems, IscCodes.ROWS_AFFECTED_BUFFER_SIZE);
 
 			return ProcessRecordsAffectedBuffer(buffer);
 		}
 
 		protected int ProcessRecordsAffectedBuffer(byte[] buffer)
 		{
-			int insertCount = 0;
-			int updateCount = 0;
-			int deleteCount = 0;
-			int selectCount = 0;
-			int pos = 0;
-			int length = 0;
-			int type = 0;
+			var insertCount = 0;
+			var updateCount = 0;
+			var deleteCount = 0;
+			var selectCount = 0;
+			var pos = 0;
+			var length = 0;
+			var type = 0;
 
 			while ((type = buffer[pos++]) != IscCodes.isc_info_end)
 			{
@@ -286,17 +282,17 @@ namespace FirebirdSql.Data.Common
 
 		protected DbStatementType GetStatementType()
 		{
-			byte[] buffer = GetSqlInfo(StatementTypeInfoItems, IscCodes.STATEMENT_TYPE_BUFFER_SIZE);
+			var buffer = GetSqlInfo(StatementTypeInfoItems, IscCodes.STATEMENT_TYPE_BUFFER_SIZE);
 
 			return ProcessStatementTypeInfoBuffer(buffer);
 		}
 
 		protected DbStatementType ProcessStatementTypeInfoBuffer(byte[] buffer)
 		{
-			DbStatementType stmtType = DbStatementType.None;
-			int pos = 0;
-			int length = 0;
-			int type = 0;
+			var stmtType = DbStatementType.None;
+			var pos = 0;
+			var length = 0;
+			var type = 0;
 
 			while ((type = buffer[pos++]) != IscCodes.isc_info_end)
 			{
@@ -322,7 +318,7 @@ namespace FirebirdSql.Data.Common
 		{
 			if (Fields != null && Fields.Count > 0)
 			{
-				for (int i = 0; i < Fields.Count; i++)
+				for (var i = 0; i < Fields.Count; i++)
 				{
 					if (Fields[i].IsArray())
 					{

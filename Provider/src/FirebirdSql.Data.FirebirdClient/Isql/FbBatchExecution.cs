@@ -1,24 +1,19 @@
 ﻿/*
- *  Firebird ADO.NET Data provider for .NET and Mono
+ *    The contents of this file are subject to the Initial
+ *    Developer's Public License Version 1.0 (the "License");
+ *    you may not use this file except in compliance with the
+ *    License. You may obtain a copy of the License at
+ *    https://github.com/FirebirdSQL/NETProvider/blob/master/license.txt.
  *
- *     The contents of this file are subject to the Initial
- *     Developer's Public License Version 1.0 (the "License");
- *     you may not use this file except in compliance with the
- *     License. You may obtain a copy of the License at
- *     http://www.firebirdsql.org/index.php?op=doc&id=idpl
+ *    Software distributed under the License is distributed on
+ *    an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
+ *    express or implied. See the License for the specific
+ *    language governing rights and limitations under the License.
  *
- *     Software distributed under the License is distributed on
- *     an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
- *     express or implied.  See the License for the specific
- *     language governing rights and limitations under the License.
- *
- *  Copyright (c) 2003-2007 Abel Eduardo Pereira
- *  Copyright (c) 2015 Jiri Cincura (jiri@cincura.net)
- *  All Rights Reserved.
- *
- * Contributors:
- *   Olivier Metod
+ *    All Rights Reserved.
  */
+
+//$Authors = Abel Eduardo Pereira, Jiri Cincura (jiri@cincura.net), Olivier Metod
 
 using System;
 using System.Data;
@@ -131,6 +126,7 @@ namespace FirebirdSql.Data.Isql
 						case SqlStatementType.AlterException:
 						case SqlStatementType.AlterFunction:
 						case SqlStatementType.AlterIndex:
+						case SqlStatementType.AlterPackage:
 						case SqlStatementType.AlterProcedure:
 						case SqlStatementType.AlterRole:
 						case SqlStatementType.AlterSequence:
@@ -144,6 +140,8 @@ namespace FirebirdSql.Data.Isql
 						case SqlStatementType.CreateFunction:
 						case SqlStatementType.CreateGenerator:
 						case SqlStatementType.CreateIndex:
+						case SqlStatementType.CreatePackage:
+						case SqlStatementType.CreatePackageBody:
 						case SqlStatementType.CreateProcedure:
 						case SqlStatementType.CreateRole:
 						case SqlStatementType.CreateSequence:
@@ -165,6 +163,8 @@ namespace FirebirdSql.Data.Isql
 						case SqlStatementType.DropFilter:
 						case SqlStatementType.DropGenerator:
 						case SqlStatementType.DropIndex:
+						case SqlStatementType.DropPackage:
+						case SqlStatementType.DropPackageBody:
 						case SqlStatementType.DropProcedure:
 						case SqlStatementType.DropSequence:
 						case SqlStatementType.DropRole:
@@ -180,10 +180,13 @@ namespace FirebirdSql.Data.Isql
 						case SqlStatementType.Grant:
 						case SqlStatementType.Insert:
 						case SqlStatementType.InsertCursor:
+						case SqlStatementType.Merge:
 						case SqlStatementType.Open:
 						case SqlStatementType.Prepare:
 						case SqlStatementType.Revoke:
 						case SqlStatementType.RecreateFunction:
+						case SqlStatementType.RecreatePackage:
+						case SqlStatementType.RecreatePackageBody:
 						case SqlStatementType.RecreateProcedure:
 						case SqlStatementType.RecreateTable:
 						case SqlStatementType.RecreateTrigger:
@@ -334,7 +337,7 @@ namespace FirebirdSql.Data.Isql
 			// [PASSWORD 'password']
 			// [CACHE int]
 			// [ROLE 'rolename']
-			SqlStringParser parser = new SqlStringParser(connectDbStatement);
+			var parser = new SqlStringParser(connectDbStatement);
 			parser.Tokens = new[] { " ", "\r\n", "\n", "\r" };
 			using (var enumerator = parser.Parse().GetEnumerator())
 			{
@@ -390,8 +393,8 @@ namespace FirebirdSql.Data.Isql
 			// [LENGTH [=] int [PAGE[S]]]
 			// [DEFAULT CHARACTER SET charset]
 			// [<secondary_file>];
-			int pageSize = 0;
-			SqlStringParser parser = new SqlStringParser(createDatabaseStatement);
+			var pageSize = 0;
+			var parser = new SqlStringParser(createDatabaseStatement);
 			parser.Tokens = new[] { " ", "\r\n", "\n", "\r" };
 			using (var enumerator = parser.Parse().GetEnumerator())
 			{
@@ -451,7 +454,7 @@ namespace FirebirdSql.Data.Isql
 		protected void SetAutoDdl(string setAutoDdlStatement, ref bool autoCommit)
 		{
 			// SET AUTODDL [ON | OFF]
-			SqlStringParser parser = new SqlStringParser(setAutoDdlStatement);
+			var parser = new SqlStringParser(setAutoDdlStatement);
 			parser.Tokens = new[] { " ", "\r\n", "\n", "\r" };
 			using (var enumerator = parser.Parse().GetEnumerator())
 			{
@@ -463,7 +466,7 @@ namespace FirebirdSql.Data.Isql
 				enumerator.MoveNext(); // AUTO
 				if (enumerator.MoveNext())
 				{
-					string onOff = enumerator.Current.Text.ToUpperInvariant();
+					var onOff = enumerator.Current.Text.ToUpperInvariant();
 					if (onOff == "ON")
 					{
 						autoCommit = true;
@@ -491,7 +494,7 @@ namespace FirebirdSql.Data.Isql
 		protected void SetNames(string setNamesStatement)
 		{
 			// SET NAMES charset
-			SqlStringParser parser = new SqlStringParser(setNamesStatement);
+			var parser = new SqlStringParser(setNamesStatement);
 			parser.Tokens = new[] { " ", "\r\n", "\n", "\r" };
 			using (var enumerator = parser.Parse().GetEnumerator())
 			{
@@ -513,7 +516,7 @@ namespace FirebirdSql.Data.Isql
 		protected void SetSqlDialect(string setSqlDialectStatement)
 		{
 			// SET SQL DIALECT dialect
-			SqlStringParser parser = new SqlStringParser(setSqlDialectStatement);
+			var parser = new SqlStringParser(setSqlDialectStatement);
 			parser.Tokens = new[] { " ", "\r\n", "\n", "\r" };
 			using (var enumerator = parser.Parse().GetEnumerator())
 			{
@@ -570,7 +573,7 @@ namespace FirebirdSql.Data.Isql
 		/// <returns>The number of rows affected by the query execution.</returns>
 		protected int ExecuteCommand(bool autoCommit)
 		{
-			int rowsAffected = _sqlCommand.ExecuteNonQuery();
+			var rowsAffected = _sqlCommand.ExecuteNonQuery();
 			if (autoCommit && _sqlCommand.IsDDLCommand)
 			{
 				CommitTransaction();

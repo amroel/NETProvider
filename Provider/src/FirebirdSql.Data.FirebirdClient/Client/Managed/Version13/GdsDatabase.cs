@@ -1,24 +1,21 @@
 ﻿/*
- *  Firebird ADO.NET Data provider for .NET and Mono
+ *    The contents of this file are subject to the Initial
+ *    Developer's Public License Version 1.0 (the "License");
+ *    you may not use this file except in compliance with the
+ *    License. You may obtain a copy of the License at
+ *    https://github.com/FirebirdSQL/NETProvider/blob/master/license.txt.
  *
- *     The contents of this file are subject to the Initial
- *     Developer's Public License Version 1.0 (the "License");
- *     you may not use this file except in compliance with the
- *     License. You may obtain a copy of the License at
- *     http://www.firebirdsql.org/index.php?op=doc&id=idpl
+ *    Software distributed under the License is distributed on
+ *    an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
+ *    express or implied. See the License for the specific
+ *    language governing rights and limitations under the License.
  *
- *     Software distributed under the License is distributed on
- *     an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
- *     express or implied.  See the License for the specific
- *     language governing rights and limitations under the License.
- *
- *  Copyright (c) 2016 Hajime Nakagami
- *	Copyright (c) 2016 Jiri Cincura (jiri@cincura.net)
- *  All Rights Reserved.
+ *    All Rights Reserved.
  */
 
+//$Authors = Hajime Nakagami, Jiri Cincura (jiri@cincura.net)
+
 using System;
-using System.Collections;
 using System.Data;
 using System.Globalization;
 using System.IO;
@@ -32,7 +29,6 @@ namespace FirebirdSql.Data.Client.Managed.Version13
 {
 	internal class GdsDatabase : Version12.GdsDatabase
 	{
-#warning Refactoring op_attach and op_create.
 		public GdsDatabase(GdsConnection connection)
 			: base(connection)
 		{ }
@@ -44,13 +40,7 @@ namespace FirebirdSql.Data.Client.Managed.Version13
 				SendAttachToBuffer(dpb, database);
 				XdrStream.Flush();
 				var response = ReadResponse();
-				while (response is CryptKeyCallbackReponse cryptResponse)
-				{
-					XdrStream.Write(IscCodes.op_crypt_key_callback);
-					XdrStream.WriteBuffer(cryptKey);
-					XdrStream.Flush();
-					response = ReadResponse();
-				}
+				response = ProcessCryptCallbackResponseIfNeeded(response, cryptKey);
 				ProcessAttachResponse(response as GenericResponse);
 			}
 			catch (IscException)
@@ -80,6 +70,38 @@ namespace FirebirdSql.Data.Client.Managed.Version13
 			XdrStream.WriteBuffer(dpb.ToArray());
 		}
 
+		public override void CreateDatabase(DatabaseParameterBuffer dpb, string dataSource, int port, string database, byte[] cryptKey)
+		{
+			try
+			{
+				SendCreateToBuffer(dpb, database);
+				XdrStream.Flush();
+
+				try
+				{
+					var response = ReadResponse();
+					response = ProcessCryptCallbackResponseIfNeeded(response, cryptKey);
+					ProcessCreateResponse(response as GenericResponse);
+
+					Detach();
+				}
+				catch (IscException)
+				{
+					try
+					{
+						CloseConnection();
+					}
+					catch
+					{ }
+					throw;
+				}
+			}
+			catch (IOException ex)
+			{
+				throw IscException.ForErrorCode(IscCodes.isc_net_write_err, ex);
+			}
+		}
+
 		protected override void SendCreateToBuffer(DatabaseParameterBuffer dpb, string database)
 		{
 			XdrStream.Write(IscCodes.op_create);
@@ -96,6 +118,18 @@ namespace FirebirdSql.Data.Client.Managed.Version13
 		public override void AttachWithTrustedAuth(DatabaseParameterBuffer dpb, string dataSource, int port, string database, byte[] cryptKey)
 		{
 			Attach(dpb, dataSource, port, database, cryptKey);
+		}
+
+		public IResponse ProcessCryptCallbackResponseIfNeeded(IResponse response, byte[] cryptKey)
+		{
+			while (response is CryptKeyCallbackResponse cryptResponse)
+			{
+				XdrStream.Write(IscCodes.op_crypt_key_callback);
+				XdrStream.WriteBuffer(cryptKey);
+				XdrStream.Flush();
+				response = ReadResponse();
+			}
+			return response;
 		}
 
 		#region Override Statement Creation Methods

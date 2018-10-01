@@ -1,27 +1,22 @@
 ﻿/*
- *  Firebird ADO.NET Data provider for .NET and Mono
+ *    The contents of this file are subject to the Initial
+ *    Developer's Public License Version 1.0 (the "License");
+ *    you may not use this file except in compliance with the
+ *    License. You may obtain a copy of the License at
+ *    https://github.com/FirebirdSQL/NETProvider/blob/master/license.txt.
  *
- *     The contents of this file are subject to the Initial
- *     Developer's Public License Version 1.0 (the "License");
- *     you may not use this file except in compliance with the
- *     License. You may obtain a copy of the License at
- *     http://www.firebirdsql.org/index.php?op=doc&id=idpl
+ *    Software distributed under the License is distributed on
+ *    an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
+ *    express or implied. See the License for the specific
+ *    language governing rights and limitations under the License.
  *
- *     Software distributed under the License is distributed on
- *     an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
- *     express or implied.  See the License for the specific
- *     language governing rights and limitations under the License.
- *
- *  Copyright (c) 2002, 2007 Carlos Guzman Alvarez
- *  All Rights Reserved.
- *
- *  Contributors:
- *   Jiri Cincura (jiri@cincura.net)
+ *    All Rights Reserved.
  */
+
+//$Authors = Carlos Guzman Alvarez, Jiri Cincura (jiri@cincura.net)
 
 #if !NETSTANDARD1_6
 using System;
-using System.Collections;
 using System.ComponentModel;
 using System.Data;
 using System.Data.Common;
@@ -220,14 +215,14 @@ namespace FirebirdSql.Data.FirebirdClient
 		/// </summary>
 		protected override int Update(DataRow[] dataRows, DataTableMapping tableMapping)
 		{
-			int updated = 0;
+			var updated = 0;
 			IDbCommand command = null;
-			StatementType statementType = StatementType.Insert;
+			var statementType = StatementType.Insert;
 			ICollection<IDbConnection> connections = new List<IDbConnection>();
 			RowUpdatingEventArgs updatingArgs = null;
 			Exception updateException = null;
 
-			foreach (DataRow row in dataRows)
+			foreach (var row in dataRows)
 			{
 				updateException = null;
 
@@ -337,7 +332,7 @@ namespace FirebirdSql.Data.FirebirdClient
 							connections.Add(command.Connection);
 						}
 
-						int rowsAffected = command.ExecuteNonQuery();
+						var rowsAffected = command.ExecuteNonQuery();
 						if (rowsAffected == 0)
 						{
 							throw new DBConcurrencyException(new DBConcurrencyException().Message, null, new DataRow[] { row });
@@ -372,11 +367,11 @@ namespace FirebirdSql.Data.FirebirdClient
 								if ((parameter.Direction == ParameterDirection.Output ||
 									parameter.Direction == ParameterDirection.ReturnValue ||
 									parameter.Direction == ParameterDirection.InputOutput) &&
-									!String.IsNullOrEmpty(parameter.SourceColumn))
+									!string.IsNullOrEmpty(parameter.SourceColumn))
 								{
 									DataColumn column = null;
 
-									DataColumnMapping columnMapping = tableMapping.GetColumnMappingBySchemaAction(
+									var columnMapping = tableMapping.GetColumnMappingBySchemaAction(
 										parameter.SourceColumn,
 										MissingMappingAction);
 
@@ -406,7 +401,7 @@ namespace FirebirdSql.Data.FirebirdClient
 				if (updatingArgs != null && updatingArgs.Status == UpdateStatus.Continue)
 				{
 					// 6. Raise	RowUpdated event
-					RowUpdatedEventArgs updatedArgs = CreateRowUpdatedEvent(row, command, statementType, tableMapping);
+					var updatedArgs = CreateRowUpdatedEvent(row, command, statementType, tableMapping);
 					OnRowUpdated(updatedArgs);
 
 					if (updatedArgs.Status == UpdateStatus.SkipAllRemainingRows)
@@ -462,7 +457,7 @@ namespace FirebirdSql.Data.FirebirdClient
 
 		private string CreateExceptionMessage(StatementType statementType)
 		{
-			System.Text.StringBuilder sb = new System.Text.StringBuilder();
+			var sb = new System.Text.StringBuilder();
 
 			sb.Append("Update requires a valid ");
 			sb.Append(statementType.ToString());
@@ -498,14 +493,14 @@ namespace FirebirdSql.Data.FirebirdClient
 			{
 				// Process only input parameters
 				if ((parameter.Direction == ParameterDirection.Input || parameter.Direction == ParameterDirection.InputOutput) &&
-					!String.IsNullOrEmpty(parameter.SourceColumn))
+					!string.IsNullOrEmpty(parameter.SourceColumn))
 				{
 					DataColumn column = null;
 
 					/* Get the DataColumnMapping that matches the given
 					 * column name
 					 */
-					DataColumnMapping columnMapping = tableMapping.GetColumnMappingBySchemaAction(
+					var columnMapping = tableMapping.GetColumnMappingBySchemaAction(
 						parameter.SourceColumn,
 						MissingMappingAction);
 
@@ -515,7 +510,7 @@ namespace FirebirdSql.Data.FirebirdClient
 
 						if (column != null)
 						{
-							DataRowVersion dataRowVersion = DataRowVersion.Default;
+							var dataRowVersion = DataRowVersion.Default;
 
 							if (statementType == StatementType.Insert)
 							{
@@ -546,7 +541,7 @@ namespace FirebirdSql.Data.FirebirdClient
 
 		private void CloseConnections(ICollection<IDbConnection> connections)
 		{
-			foreach (IDbConnection c in connections)
+			foreach (var c in connections)
 			{
 				c.Close();
 			}

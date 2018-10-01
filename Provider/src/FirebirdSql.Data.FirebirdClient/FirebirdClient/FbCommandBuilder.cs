@@ -1,23 +1,19 @@
 ﻿/*
- *  Firebird ADO.NET Data provider for .NET and Mono
+ *    The contents of this file are subject to the Initial
+ *    Developer's Public License Version 1.0 (the "License");
+ *    you may not use this file except in compliance with the
+ *    License. You may obtain a copy of the License at
+ *    https://github.com/FirebirdSQL/NETProvider/blob/master/license.txt.
  *
- *     The contents of this file are subject to the Initial
- *     Developer's Public License Version 1.0 (the "License");
- *     you may not use this file except in compliance with the
- *     License. You may obtain a copy of the License at
- *     http://www.firebirdsql.org/index.php?op=doc&id=idpl
+ *    Software distributed under the License is distributed on
+ *    an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
+ *    express or implied. See the License for the specific
+ *    language governing rights and limitations under the License.
  *
- *     Software distributed under the License is distributed on
- *     an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
- *     express or implied.  See the License for the specific
- *     language governing rights and limitations under the License.
- *
- *  Copyright (c) 2002, 2007 Carlos Guzman Alvarez
- *  All Rights Reserved.
- *
- *  Contributors:
- *    Jiri Cincura (jiri@cincura.net)
+ *    All Rights Reserved.
  */
+
+//$Authors = Carlos Guzman Alvarez, Jiri Cincura (jiri@cincura.net)
 
 #if !NETSTANDARD1_6
 using System;
@@ -42,9 +38,9 @@ namespace FirebirdSql.Data.FirebirdClient
 				throw new InvalidOperationException("DeriveParameters only supports CommandType.StoredProcedure.");
 			}
 
-			string spName = command.CommandText.Trim();
-			string quotePrefix = "\"";
-			string quoteSuffix = "\"";
+			var spName = command.CommandText.Trim();
+			var quotePrefix = "\"";
+			var quoteSuffix = "\"";
 
 			if (spName.StartsWith(quotePrefix) && spName.EndsWith(quoteSuffix))
 			{
@@ -52,16 +48,16 @@ namespace FirebirdSql.Data.FirebirdClient
 			}
 			else
 			{
-				spName = spName.ToUpper(CultureInfo.CurrentUICulture);
+				spName = spName.ToUpper(CultureInfo.CurrentCulture);
 			}
 
-			string paramsText = string.Empty;
+			var paramsText = string.Empty;
 
 			command.Parameters.Clear();
 
-			DataView dataTypes = command.Connection.GetSchema("DataTypes").DefaultView;
+			var dataTypes = command.Connection.GetSchema("DataTypes").DefaultView;
 
-			DataTable spSchema = command.Connection.GetSchema(
+			var spSchema = command.Connection.GetSchema(
 				"ProcedureParameters", new string[] { null, null, spName });
 
 			// SP has zero params. or not exist
@@ -74,12 +70,11 @@ namespace FirebirdSql.Data.FirebirdClient
 
 			foreach (DataRow row in spSchema.Rows)
 			{
-				dataTypes.RowFilter = String.Format(
-					CultureInfo.CurrentUICulture,
+				dataTypes.RowFilter = string.Format(
 					"TypeName = '{0}'",
 					row["PARAMETER_DATA_TYPE"]);
 
-				FbParameter parameter = command.Parameters.Add(
+				var parameter = command.Parameters.Add(
 					"@" + row["PARAMETER_NAME"].ToString().Trim(),
 					FbDbType.VarChar);
 
@@ -122,7 +117,7 @@ namespace FirebirdSql.Data.FirebirdClient
 			get { return base.QuotePrefix; }
 			set
 			{
-				if (String.IsNullOrEmpty(value))
+				if (string.IsNullOrEmpty(value))
 				{
 					base.QuotePrefix = value;
 				}
@@ -141,7 +136,7 @@ namespace FirebirdSql.Data.FirebirdClient
 			get { return base.QuoteSuffix; }
 			set
 			{
-				if (String.IsNullOrEmpty(value))
+				if (string.IsNullOrEmpty(value))
 				{
 					base.QuoteSuffix = value;
 				}
@@ -218,7 +213,7 @@ namespace FirebirdSql.Data.FirebirdClient
 				throw new ArgumentNullException("Unquoted identifier parameter cannot be null");
 			}
 
-			return String.Format("{0}{1}{2}", QuotePrefix, unquotedIdentifier, QuoteSuffix);
+			return string.Format("{0}{1}{2}", QuotePrefix, unquotedIdentifier, QuoteSuffix);
 		}
 
 		public override string UnquoteIdentifier(string quotedIdentifier)
@@ -228,7 +223,7 @@ namespace FirebirdSql.Data.FirebirdClient
 				throw new ArgumentNullException("Quoted identifier parameter cannot be null");
 			}
 
-			string unquotedIdentifier = quotedIdentifier.Trim();
+			var unquotedIdentifier = quotedIdentifier.Trim();
 
 			if (unquotedIdentifier.StartsWith(QuotePrefix))
 			{
@@ -248,7 +243,7 @@ namespace FirebirdSql.Data.FirebirdClient
 
 		protected override void ApplyParameterInfo(DbParameter p, DataRow row, StatementType statementType, bool whereClause)
 		{
-			FbParameter parameter = (FbParameter)p;
+			var parameter = (FbParameter)p;
 
 			parameter.Size = int.Parse(row["ColumnSize"].ToString());
 			if (row["NumericPrecision"] != DBNull.Value)
@@ -264,12 +259,12 @@ namespace FirebirdSql.Data.FirebirdClient
 
 		protected override string GetParameterName(int parameterOrdinal)
 		{
-			return String.Format("@p{0}", parameterOrdinal);
+			return string.Format("@p{0}", parameterOrdinal);
 		}
 
 		protected override string GetParameterName(string parameterName)
 		{
-			return String.Format("@{0}", parameterName);
+			return string.Format("@{0}", parameterName);
 		}
 
 		protected override string GetParameterPlaceholder(int parameterOrdinal)
@@ -281,7 +276,7 @@ namespace FirebirdSql.Data.FirebirdClient
 		{
 			if (!(adapter is FbDataAdapter))
 			{
-				throw new InvalidOperationException("adapter needs to be a FbDataAdapter");
+				throw new ArgumentException($"Argument needs to be a {nameof(FbDataAdapter)}.", nameof(adapter));
 			}
 
 			_rowUpdatingHandler = new EventHandler<FbRowUpdatingEventArgs>(RowUpdatingHandler);

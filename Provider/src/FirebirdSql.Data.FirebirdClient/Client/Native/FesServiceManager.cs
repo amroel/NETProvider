@@ -1,23 +1,19 @@
 ﻿/*
- *	Firebird ADO.NET Data provider for .NET and Mono
+ *    The contents of this file are subject to the Initial
+ *    Developer's Public License Version 1.0 (the "License");
+ *    you may not use this file except in compliance with the
+ *    License. You may obtain a copy of the License at
+ *    https://github.com/FirebirdSQL/NETProvider/blob/master/license.txt.
  *
- *	   The contents of this file are subject to the Initial
- *	   Developer's Public License Version 1.0 (the "License");
- *	   you may not use this file except in compliance with the
- *	   License. You may obtain a copy of the License at
- *	   http://www.firebirdsql.org/index.php?op=doc&id=idpl
+ *    Software distributed under the License is distributed on
+ *    an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
+ *    express or implied. See the License for the specific
+ *    language governing rights and limitations under the License.
  *
- *	   Software distributed under the License is distributed on
- *	   an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
- *	   express or implied. See the License for the specific
- *	   language governing rights and limitations under the License.
- *
- *	Copyright (c) 2002, 2007 Carlos Guzman Alvarez
- *	All Rights Reserved.
- *
- * Contributors:
- *   Jiri Cincura (jiri@cincura.net)
+ *    All Rights Reserved.
  */
+
+//$Authors = Carlos Guzman Alvarez, Jiri Cincura (jiri@cincura.net)
 
 using System;
 using System.IO;
@@ -27,7 +23,19 @@ namespace FirebirdSql.Data.Client.Native
 {
 	internal sealed class FesServiceManager : IServiceManager
 	{
+		#region Callbacks
+
+		public Action<IscException> WarningMessage
+		{
+			get { return _warningMessage; }
+			set { _warningMessage = value; }
+		}
+
+		#endregion
+
 		#region Fields
+
+		private Action<IscException> _warningMessage;
 
 		private IFbClient _fbClient;
 		private int _handle;
@@ -56,7 +64,7 @@ namespace FirebirdSql.Data.Client.Native
 		public FesServiceManager(string dllName, Charset charset)
 		{
 			_fbClient = FbClientFactory.GetFbClient(dllName);
-			_charset = (charset != null ? charset : Charset.DefaultCharset);
+			_charset = charset ?? Charset.DefaultCharset;
 			_statusVector = new IntPtr[IscCodes.ISC_STATUS_LENGTH];
 		}
 
@@ -64,11 +72,13 @@ namespace FirebirdSql.Data.Client.Native
 
 		#region Methods
 
-		public void Attach(ServiceParameterBuffer spb, string dataSource, int port, string service)
+		public void Attach(ServiceParameterBuffer spb, string dataSource, int port, string service, byte[] cryptKey)
 		{
+			FesDatabase.CheckCryptKeyForSupport(cryptKey);
+
 			ClearStatusVector();
 
-			int svcHandle = Handle;
+			var svcHandle = Handle;
 
 			_fbClient.isc_service_attach(
 				_statusVector,
@@ -87,7 +97,7 @@ namespace FirebirdSql.Data.Client.Native
 		{
 			ClearStatusVector();
 
-			int svcHandle = Handle;
+			var svcHandle = Handle;
 
 			_fbClient.isc_service_detach(_statusVector, ref svcHandle);
 
@@ -100,8 +110,8 @@ namespace FirebirdSql.Data.Client.Native
 		{
 			ClearStatusVector();
 
-			int svcHandle = Handle;
-			int reserved = 0;
+			var svcHandle = Handle;
+			var reserved = 0;
 
 			_fbClient.isc_service_start(
 				_statusVector,
@@ -122,8 +132,8 @@ namespace FirebirdSql.Data.Client.Native
 		{
 			ClearStatusVector();
 
-			int svcHandle = Handle;
-			int reserved = 0;
+			var svcHandle = Handle;
+			var reserved = 0;
 
 			_fbClient.isc_service_query(
 				_statusVector,
@@ -145,14 +155,13 @@ namespace FirebirdSql.Data.Client.Native
 
 		private void ProcessStatusVector(IntPtr[] statusVector)
 		{
-			IscException ex = FesConnection.ParseStatusVector(statusVector, _charset);
+			var ex = FesConnection.ParseStatusVector(statusVector, _charset);
 
 			if (ex != null)
 			{
 				if (ex.IsWarning)
 				{
-#warning This is not propagated to FesDatabase's callback as with GdsDatabase
-					//_warningMessage?.Invoke(ex);
+					_warningMessage?.Invoke(ex);
 				}
 				else
 				{

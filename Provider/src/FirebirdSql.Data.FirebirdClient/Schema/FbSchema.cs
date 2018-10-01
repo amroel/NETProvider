@@ -1,23 +1,19 @@
 ﻿/*
- *  Firebird ADO.NET Data provider for .NET and Mono
+ *    The contents of this file are subject to the Initial
+ *    Developer's Public License Version 1.0 (the "License");
+ *    you may not use this file except in compliance with the
+ *    License. You may obtain a copy of the License at
+ *    https://github.com/FirebirdSQL/NETProvider/blob/master/license.txt.
  *
- *     The contents of this file are subject to the Initial
- *     Developer's Public License Version 1.0 (the "License");
- *     you may not use this file except in compliance with the
- *     License. You may obtain a copy of the License at
- *     http://www.firebirdsql.org/index.php?op=doc&id=idpl
+ *    Software distributed under the License is distributed on
+ *    an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
+ *    express or implied. See the License for the specific
+ *    language governing rights and limitations under the License.
  *
- *     Software distributed under the License is distributed on
- *     an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
- *     express or implied.  See the License for the specific
- *     language governing rights and limitations under the License.
- *
- *  Copyright (c) 2002, 2007 Carlos Guzman Alvarez
- *  All Rights Reserved.
- *
- *  Contributors:
- *      Jiri Cincura (jiri@cincura.net)
+ *    All Rights Reserved.
  */
+
+//$Authors = Carlos Guzman Alvarez, Jiri Cincura (jiri@cincura.net)
 
 #if !NETSTANDARD1_6
 using System;
@@ -26,7 +22,6 @@ using System.Data.Common;
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Collections;
 
 using FirebirdSql.Data.FirebirdClient;
 using FirebirdSql.Data.Common;
@@ -53,10 +48,10 @@ namespace FirebirdSql.Data.Schema
 
 		public DataTable GetSchema(FbConnection connection, string collectionName, string[] restrictions)
 		{
-			DataTable dataTable = new DataTable(collectionName);
-			using (FbCommand command = BuildCommand(connection, collectionName, ParseRestrictions(restrictions)))
+			var dataTable = new DataTable(collectionName);
+			using (var command = BuildCommand(connection, collectionName, ParseRestrictions(restrictions)))
 			{
-				using (FbDataAdapter adapter = new FbDataAdapter(command))
+				using (var adapter = new FbDataAdapter(command))
 				{
 					try
 					{
@@ -78,25 +73,25 @@ namespace FirebirdSql.Data.Schema
 
 		protected FbCommand BuildCommand(FbConnection connection, string collectionName, string[] restrictions)
 		{
-			string filter = String.Format("CollectionName='{0}'", collectionName);
-			StringBuilder builder = GetCommandText(restrictions);
-			DataRow[] restriction = connection.GetSchema(DbMetaDataCollectionNames.Restrictions).Select(filter);
-			FbTransaction transaction = connection.InnerConnection.ActiveTransaction;
-			FbCommand command = new FbCommand(builder.ToString(), connection, transaction);
+			var filter = string.Format("CollectionName='{0}'", collectionName);
+			var builder = GetCommandText(restrictions);
+			var restriction = connection.GetSchema(DbMetaDataCollectionNames.Restrictions).Select(filter);
+			var transaction = connection.InnerConnection.ActiveTransaction;
+			var command = new FbCommand(builder.ToString(), connection, transaction);
 
 			if (restrictions != null && restrictions.Length > 0)
 			{
-				int index = 0;
+				var index = 0;
 
-				for (int i = 0; i < restrictions.Length; i++)
+				for (var i = 0; i < restrictions.Length; i++)
 				{
-					string rname = restriction[i]["RestrictionName"].ToString();
+					var rname = restriction[i]["RestrictionName"].ToString();
 					if (restrictions[i] != null)
 					{
 						// Catalog, Schema and TableType are no real restrictions
 						if (!rname.EndsWith("Catalog") && !rname.EndsWith("Schema") && rname != "TableType")
 						{
-							string pname = String.Format(CultureInfo.CurrentUICulture, "@p{0}", index++);
+							var pname = string.Format("@p{0}", index++);
 
 							command.Parameters.Add(pname, FbDbType.VarChar, 255).Value = restrictions[i];
 						}
@@ -127,7 +122,7 @@ namespace FirebirdSql.Data.Schema
 
 			foreach (DataRow row in schema.Rows)
 			{
-				for (int i = 0; i < schema.Columns.Count; i++)
+				for (var i = 0; i < schema.Columns.Count; i++)
 				{
 					if (!row.IsNull(schema.Columns[i]) &&
 						schema.Columns[i].DataType == typeof(System.String))

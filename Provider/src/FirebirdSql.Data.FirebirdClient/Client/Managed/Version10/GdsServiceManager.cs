@@ -1,23 +1,19 @@
 ﻿/*
- *	Firebird ADO.NET Data provider for .NET and Mono
+ *    The contents of this file are subject to the Initial
+ *    Developer's Public License Version 1.0 (the "License");
+ *    you may not use this file except in compliance with the
+ *    License. You may obtain a copy of the License at
+ *    https://github.com/FirebirdSQL/NETProvider/blob/master/license.txt.
  *
- *	   The contents of this file are subject to the Initial
- *	   Developer's Public License Version 1.0 (the "License");
- *	   you may not use this file except in compliance with the
- *	   License. You may obtain a copy of the License at
- *	   http://www.firebirdsql.org/index.php?op=doc&id=idpl
+ *    Software distributed under the License is distributed on
+ *    an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
+ *    express or implied. See the License for the specific
+ *    language governing rights and limitations under the License.
  *
- *	   Software distributed under the License is distributed on
- *	   an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
- *	   express or implied. See the License for the specific
- *	   language governing rights and limitations under the License.
- *
- *	Copyright (c) 2002, 2007 Carlos Guzman Alvarez
- *	All Rights Reserved.
- *
- *  Contributors:
- *      Jiri Cincura (jiri@cincura.net)
+ *    All Rights Reserved.
  */
+
+//$Authors = Carlos Guzman Alvarez, Jiri Cincura (jiri@cincura.net)
 
 using System;
 using System.IO;
@@ -25,13 +21,25 @@ using FirebirdSql.Data.Common;
 
 namespace FirebirdSql.Data.Client.Managed.Version10
 {
-	internal sealed class GdsServiceManager : IServiceManager
+	internal class GdsServiceManager : IServiceManager
 	{
+		#region Callbacks
+
+		public Action<IscException> WarningMessage
+		{
+			get { return _warningMessage; }
+			set { _warningMessage = value; }
+		}
+
+		#endregion
+
 		#region Fields
 
+		private Action<IscException> _warningMessage;
+
 		private int _handle;
-		private GdsDatabase _database;
 		private GdsConnection _connection;
+		private GdsDatabase _database;
 
 		#endregion
 
@@ -47,6 +55,11 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 			get { return _connection.AuthData; }
 		}
 
+		public GdsDatabase Database
+		{
+			get { return _database; }
+		}
+
 		#endregion
 
 		#region Constructors
@@ -54,29 +67,21 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 		public GdsServiceManager(GdsConnection connection)
 		{
 			_connection = connection;
-			_database = new GdsDatabase(_connection);
+			_database = CreateDatabase(_connection);
+			RewireWarningMessage();
 		}
 
 		#endregion
 
 		#region Methods
 
-		public void Attach(ServiceParameterBuffer spb, string dataSource, int port, string service)
+		public virtual void Attach(ServiceParameterBuffer spb, string dataSource, int port, string service, byte[] cryptKey)
 		{
-			GenericResponse response = null;
-
 			try
 			{
-#warning Separate method for op_service_attach as for i.e. op_attach
-				_database.XdrStream.Write(IscCodes.op_service_attach);
-				_database.XdrStream.Write(0);
-				_database.XdrStream.Write(service);
-				_database.XdrStream.WriteBuffer(spb.ToArray());
+				SendAttachToBuffer(spb, service);
 				_database.XdrStream.Flush();
-
-				response = _database.ReadGenericResponse();
-
-				_handle = response.ObjectHandle;
+				ProcessAttachResponse(_database.ReadGenericResponse());
 			}
 			catch (IOException ex)
 			{
@@ -85,7 +90,20 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 			}
 		}
 
-		public void Detach()
+		protected virtual void SendAttachToBuffer(ServiceParameterBuffer spb, string service)
+		{
+			_database.XdrStream.Write(IscCodes.op_service_attach);
+			_database.XdrStream.Write(0);
+			_database.XdrStream.Write(service);
+			_database.XdrStream.WriteBuffer(spb.ToArray());
+		}
+
+		protected virtual void ProcessAttachResponse(GenericResponse response)
+		{
+			_handle = response.ObjectHandle;
+		}
+
+		public virtual void Detach()
 		{
 			try
 			{
@@ -118,7 +136,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 			}
 		}
 
-		public void Start(ServiceParameterBuffer spb)
+		public virtual void Start(ServiceParameterBuffer spb)
 		{
 			try
 			{
@@ -143,7 +161,7 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 			}
 		}
 
-		public void Query(ServiceParameterBuffer spb, int requestLength, byte[] requestBuffer, int bufferLength, byte[] buffer)
+		public virtual void Query(ServiceParameterBuffer spb, int requestLength, byte[] requestBuffer, int bufferLength, byte[] buffer)
 		{
 			try
 			{
@@ -156,9 +174,9 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 
 				_database.XdrStream.Flush();
 
-				GenericResponse response = _database.ReadGenericResponse();
+				var response = _database.ReadGenericResponse();
 
-				int responseLength = bufferLength;
+				var responseLength = bufferLength;
 
 				if (response.Data.Length < bufferLength)
 				{
@@ -171,6 +189,16 @@ namespace FirebirdSql.Data.Client.Managed.Version10
 			{
 				throw IscException.ForErrorCode(IscCodes.isc_network_error, ex);
 			}
+		}
+
+		protected virtual GdsDatabase CreateDatabase(GdsConnection connection)
+		{
+			return new GdsDatabase(connection);
+		}
+
+		private void RewireWarningMessage()
+		{
+			_database.WarningMessage = ex => _warningMessage?.Invoke(ex);
 		}
 
 		#endregion

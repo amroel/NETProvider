@@ -1,23 +1,19 @@
 ﻿/*
- *	Firebird ADO.NET Data provider for .NET and Mono
+ *    The contents of this file are subject to the Initial
+ *    Developer's Public License Version 1.0 (the "License");
+ *    you may not use this file except in compliance with the
+ *    License. You may obtain a copy of the License at
+ *    https://github.com/FirebirdSQL/NETProvider/blob/master/license.txt.
  *
- *	   The contents of this file are subject to the Initial
- *	   Developer's Public License Version 1.0 (the "License");
- *	   you may not use this file except in compliance with the
- *	   License. You may obtain a copy of the License at
- *	   http://www.firebirdsql.org/index.php?op=doc&id=idpl
+ *    Software distributed under the License is distributed on
+ *    an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
+ *    express or implied. See the License for the specific
+ *    language governing rights and limitations under the License.
  *
- *	   Software distributed under the License is distributed on
- *	   an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
- *	   express or implied. See the License for the specific
- *	   language governing rights and limitations under the License.
- *
- *	Copyright (c) 2002, 2007 Carlos Guzman Alvarez
- *	All Rights Reserved.
- *
- *  Contributors:
- *      Jiri Cincura (jiri@cincura.net)
+ *    All Rights Reserved.
  */
+
+//$Authors = Carlos Guzman Alvarez, Jiri Cincura (jiri@cincura.net)
 
 using System;
 using System.Collections.Generic;
@@ -26,10 +22,8 @@ using System.Text;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
-#if NETSTANDARD1_6 || NETSTANDARD2_0
-using Microsoft.Extensions.PlatformAbstractions;
-#endif
 using FirebirdSql.Data.Common;
+using System.Linq;
 #if !NETSTANDARD1_6
 using FirebirdSql.Data.Schema;
 #endif
@@ -42,7 +36,7 @@ namespace FirebirdSql.Data.FirebirdClient
 
 		private IDatabase _db;
 		private FbTransaction _activeTransaction;
-		private List<WeakReference> _preparedCommands;
+		private List<WeakReference<FbCommand>> _preparedCommands;
 		private FbConnectionString _options;
 		private FbConnection _owningConnection;
 		private bool _disposed;
@@ -102,7 +96,7 @@ namespace FirebirdSql.Data.FirebirdClient
 
 		public FbConnectionInternal(FbConnectionString options)
 		{
-			_preparedCommands = new List<WeakReference>();
+			_preparedCommands = new List<WeakReference<FbCommand>>();
 
 			_options = options;
 		}
@@ -126,13 +120,13 @@ namespace FirebirdSql.Data.FirebirdClient
 
 		public void CreateDatabase(DatabaseParameterBuffer dpb)
 		{
-			IDatabase db = ClientFactory.CreateDatabase(_options);
-			db.CreateDatabase(dpb, _options.DataSource, _options.Port, _options.Database);
+			var db = ClientFactory.CreateDatabase(_options);
+			db.CreateDatabase(dpb, _options.DataSource, _options.Port, _options.Database, _options.CryptKey);
 		}
 
 		public void DropDatabase()
 		{
-			IDatabase db = ClientFactory.CreateDatabase(_options);
+			var db = ClientFactory.CreateDatabase(_options);
 			db.Attach(BuildDpb(db, _options), _options.DataSource, _options.Port, _options.Database, _options.CryptKey);
 			db.DropDatabase();
 		}
@@ -155,7 +149,7 @@ namespace FirebirdSql.Data.FirebirdClient
 				_db.Dialect = _options.Dialect;
 				_db.PacketSize = _options.PacketSize;
 
-				DatabaseParameterBuffer dpb = BuildDpb(_db, _options);
+				var dpb = BuildDpb(_db, _options);
 
 				if (string.IsNullOrEmpty(_options.UserID) && string.IsNullOrEmpty(_options.Password))
 				{
@@ -252,9 +246,9 @@ namespace FirebirdSql.Data.FirebirdClient
 
 		public void TransactionCompleted()
 		{
-			for (int i = 0; i < _preparedCommands.Count; i++)
+			for (var i = 0; i < _preparedCommands.Count; i++)
 			{
-				if (!_preparedCommands[i].TryGetTarget(out FbCommand command))
+				if (!_preparedCommands[i].TryGetTarget(out var command))
 					continue;
 
 				if (command.Transaction != null)
@@ -272,7 +266,7 @@ namespace FirebirdSql.Data.FirebirdClient
 #if !NETSTANDARD1_6
 		public void EnlistTransaction(System.Transactions.Transaction transaction)
 		{
-			if (_owningConnection != null && _options.Enlist)
+			if (_owningConnection != null)
 			{
 				if (_enlistmentNotification != null && _enlistmentNotification.SystemTransaction == transaction)
 					return;
@@ -342,10 +336,10 @@ namespace FirebirdSql.Data.FirebirdClient
 
 		public void AddPreparedCommand(FbCommand command)
 		{
-			int position = -1;
-			for (int i = 0; i < _preparedCommands.Count; i++)
+			var position = -1;
+			for (var i = 0; i < _preparedCommands.Count; i++)
 			{
-				if (!_preparedCommands[i].TryGetTarget(out FbCommand current))
+				if (!_preparedCommands[i].TryGetTarget(out var current))
 				{
 					position = i;
 				}
@@ -357,22 +351,22 @@ namespace FirebirdSql.Data.FirebirdClient
 					}
 				}
 			}
-			if (position >= 0)
+			if (position != -1)
 			{
-				_preparedCommands[position].Target = command;
+				_preparedCommands[position].SetTarget(command);
 			}
 			else
 			{
-				_preparedCommands.Add(new WeakReference(command));
+				_preparedCommands.Add(new WeakReference<FbCommand>(command));
 			}
 		}
 
 		public void RemovePreparedCommand(FbCommand command)
 		{
-			for (int i = _preparedCommands.Count - 1; i >= 0; i--)
+			for (var i = _preparedCommands.Count - 1; i >= 0; i--)
 			{
 				var item = _preparedCommands[i];
-				if (item.TryGetTarget<FbCommand>(out var current) && current == command)
+				if (item.TryGetTarget(out var current) && current == command)
 				{
 					_preparedCommands.RemoveAt(i);
 					return;
@@ -382,16 +376,16 @@ namespace FirebirdSql.Data.FirebirdClient
 
 		public void ReleasePreparedCommands()
 		{
-			for (int i = 0; i < _preparedCommands.Count; i++)
+			for (var i = 0; i < _preparedCommands.Count; i++)
 			{
-				if (!_preparedCommands[i].TryGetTarget(out FbCommand current))
+				if (!_preparedCommands[i].TryGetTarget(out var current))
 					continue;
 
 				try
 				{
 					current.Release();
 				}
-				catch (System.IO.IOException)
+				catch (IOException)
 				{
 					// If an IO error occurs weh trying to release the command
 					// avoid it. ( It maybe the connection to the server was down
@@ -424,35 +418,11 @@ namespace FirebirdSql.Data.FirebirdClient
 
 		#endregion
 
-		#region Connection Verification
-
-		public bool Verify()
-		{
-			// Do not actually ask for any information
-			byte[] items = new byte[]
-			{
-				IscCodes.isc_info_end
-			};
-
-			try
-			{
-				_db.GetDatabaseInfo(items, 16);
-
-				return true;
-			}
-			catch
-			{
-				return false;
-			}
-		}
-
-		#endregion
-
 		#region Private Methods
 
 		private DatabaseParameterBuffer BuildDpb(IDatabase db, FbConnectionString options)
 		{
-			DatabaseParameterBuffer dpb = new DatabaseParameterBuffer();
+			var dpb = new DatabaseParameterBuffer();
 
 			dpb.Append(IscCodes.isc_dpb_version1);
 			dpb.Append(IscCodes.isc_dpb_dummy_packet_interval, new byte[] { 120, 10, 0, 0 });
@@ -473,7 +443,7 @@ namespace FirebirdSql.Data.FirebirdClient
 			dpb.Append(IscCodes.isc_dpb_connect_timeout, options.ConnectionTimeout);
 			dpb.Append(IscCodes.isc_dpb_process_id, GetProcessId());
 			dpb.Append(IscCodes.isc_dpb_process_name, GetProcessName());
-			dpb.Append(IscCodes.isc_dpb_client_version, Properties.VersionInfo.Version);
+			dpb.Append(IscCodes.isc_dpb_client_version, _VersionInfo.Version);
 			if (options.NoDatabaseTriggers)
 			{
 				dpb.Append(IscCodes.isc_dpb_no_db_triggers, 1);
@@ -488,53 +458,50 @@ namespace FirebirdSql.Data.FirebirdClient
 
 		private string GetProcessName()
 		{
-			// showing ApplicationPhysicalPath may be wrong because of connection pooling; better idea?
-			return GetHostingPath() ?? GetRealProcessName();
+			return GetSystemWebHostingPath() ?? GetRealProcessName() ?? string.Empty;
 		}
 
 
-		private string GetHostingPath()
+		private string GetSystemWebHostingPath()
 		{
 #if NETSTANDARD1_6 || NETSTANDARD2_0
-			return PlatformServices.Default.Application.ApplicationBasePath;
+			return null;
 #else
-			Assembly assembly;
-			try
-			{
-				assembly = Assembly.Load(string.Format("System.Web, Version={0}.{1}.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a", Environment.Version.Major, Environment.Version.Minor));
-			}
-			catch (FileNotFoundException)
-			{
+			var assembly = AppDomain.CurrentDomain.GetAssemblies().Where(x => x.GetName().Name.Equals("System.Web", StringComparison.Ordinal)).FirstOrDefault();
+			if (assembly == null)
 				return null;
-			}
-			catch (FileLoadException)
-			{
-				return null;
-			}
-			catch (BadImageFormatException)
-			{
-				return null;
-			}
-			return (string)assembly
-				.GetType("System.Web.Hosting.HostingEnvironment")
-				.GetProperty("ApplicationPhysicalPath")
-				.GetValue(null, null);
+			// showing ApplicationPhysicalPath may be wrong because of connection pooling
+			// better idea?
+			return (string)assembly.GetType("System.Web.Hosting.HostingEnvironment").GetProperty("ApplicationPhysicalPath").GetValue(null, null);
 #endif
 		}
+
 		private string GetRealProcessName()
 		{
-			Assembly assembly = Assembly.GetEntryAssembly();
-			return assembly?.Location ?? Process.GetCurrentProcess().MainModule.FileName;
+			string FromProcess()
+			{
+				try
+				{
+					return Process.GetCurrentProcess().MainModule.FileName;
+				}
+				catch (InvalidOperationException)
+				{
+					return null;
+				}
+			}
+			return Assembly.GetEntryAssembly()?.Location ?? FromProcess();
 		}
 
 		private int GetProcessId()
 		{
-#if !NETSTANDARD1_6
-			Assembly assembly = Assembly.GetEntryAssembly();
-			if (!(assembly?.IsFullyTrusted) ?? false)
+			try
+			{
+				return Process.GetCurrentProcess().Id;
+			}
+			catch (InvalidOperationException)
+			{
 				return -1;
-#endif
-			return Process.GetCurrentProcess().Id;
+			}
 		}
 
 		private void EnsureActiveTransaction()

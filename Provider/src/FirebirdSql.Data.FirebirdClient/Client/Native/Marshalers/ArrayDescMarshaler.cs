@@ -1,23 +1,19 @@
 ﻿/*
- *	Firebird ADO.NET Data provider for .NET and Mono
+ *    The contents of this file are subject to the Initial
+ *    Developer's Public License Version 1.0 (the "License");
+ *    you may not use this file except in compliance with the
+ *    License. You may obtain a copy of the License at
+ *    https://github.com/FirebirdSQL/NETProvider/blob/master/license.txt.
  *
- *	   The contents of this file are subject to the Initial
- *	   Developer's Public License Version 1.0 (the "License");
- *	   you may not use this file except in compliance with the
- *	   License. You may obtain a copy of the License at
- *	   http://www.firebirdsql.org/index.php?op=doc&id=idpl
+ *    Software distributed under the License is distributed on
+ *    an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
+ *    express or implied. See the License for the specific
+ *    language governing rights and limitations under the License.
  *
- *	   Software distributed under the License is distributed on
- *	   an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
- *	   express or implied. See the License for the specific
- *	   language governing rights and limitations under the License.
- *
- *	Copyright (c) 2002, 2007 Carlos Guzman Alvarez
- *	All Rights Reserved.
- *
- *  Contributors:
- *    Jiri Cincura (jiri@cincura.net)
+ *    All Rights Reserved.
  */
+
+//$Authors = Carlos Guzman Alvarez, Jiri Cincura (jiri@cincura.net)
 
 using System;
 using System.Runtime.InteropServices;
@@ -32,11 +28,11 @@ namespace FirebirdSql.Data.Client.Native.Marshalers
 		{
 			if (pNativeData != IntPtr.Zero)
 			{
-				Marshal2.DestroyStructure<ArrayDescMarshal>(pNativeData);
+				Marshal.DestroyStructure<ArrayDescMarshal>(pNativeData);
 
-				for (int i = 0; i < 16; i++)
+				for (var i = 0; i < 16; i++)
 				{
-					Marshal2.DestroyStructure<ArrayBoundMarshal>(pNativeData + ArrayDescMarshal.ComputeLength(i));
+					Marshal.DestroyStructure<ArrayBoundMarshal>(pNativeData + ArrayDescMarshal.ComputeLength(i));
 				}
 
 				Marshal.FreeHGlobal(pNativeData);
@@ -47,7 +43,7 @@ namespace FirebirdSql.Data.Client.Native.Marshalers
 
 		public static IntPtr MarshalManagedToNative(ArrayDesc descriptor)
 		{
-			ArrayDescMarshal arrayDesc = new ArrayDescMarshal();
+			var arrayDesc = new ArrayDescMarshal();
 
 			arrayDesc.DataType = descriptor.DataType;
 			arrayDesc.Scale = (byte)descriptor.Scale;
@@ -57,9 +53,9 @@ namespace FirebirdSql.Data.Client.Native.Marshalers
 			arrayDesc.Dimensions = descriptor.Dimensions;
 			arrayDesc.Flags = descriptor.Flags;
 
-			ArrayBoundMarshal[] arrayBounds = new ArrayBoundMarshal[descriptor.Bounds.Length];
+			var arrayBounds = new ArrayBoundMarshal[descriptor.Bounds.Length];
 
-			for (int i = 0; i < descriptor.Dimensions; i++)
+			for (var i = 0; i < descriptor.Dimensions; i++)
 			{
 				arrayBounds[i].LowerBound = (short)descriptor.Bounds[i].LowerBound;
 				arrayBounds[i].UpperBound = (short)descriptor.Bounds[i].UpperBound;
@@ -70,11 +66,11 @@ namespace FirebirdSql.Data.Client.Native.Marshalers
 
 		public static IntPtr MarshalManagedToNative(ArrayDescMarshal arrayDesc, ArrayBoundMarshal[] arrayBounds)
 		{
-			int size = ArrayDescMarshal.ComputeLength(arrayBounds.Length);
-			IntPtr ptr = Marshal.AllocHGlobal(size);
+			var size = ArrayDescMarshal.ComputeLength(arrayBounds.Length);
+			var ptr = Marshal.AllocHGlobal(size);
 
 			Marshal.StructureToPtr(arrayDesc, ptr, true);
-			for (int i = 0; i < arrayBounds.Length; i++)
+			for (var i = 0; i < arrayBounds.Length; i++)
 			{
 				Marshal.StructureToPtr(arrayBounds[i], ptr + ArrayDescMarshal.ComputeLength(i), true);
 			}

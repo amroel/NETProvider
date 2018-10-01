@@ -1,21 +1,19 @@
 ﻿/*
- *	Firebird ADO.NET Data provider for .NET and Mono
+ *    The contents of this file are subject to the Initial
+ *    Developer's Public License Version 1.0 (the "License");
+ *    you may not use this file except in compliance with the
+ *    License. You may obtain a copy of the License at
+ *    https://github.com/FirebirdSQL/NETProvider/blob/master/license.txt.
  *
- *	   The contents of this file are subject to the Initial
- *	   Developer's Public License Version 1.0 (the "License");
- *	   you may not use this file except in compliance with the
- *	   License. You may obtain a copy of the License at
- *	   http://www.firebirdsql.org/index.php?op=doc&id=idpl
+ *    Software distributed under the License is distributed on
+ *    an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
+ *    express or implied. See the License for the specific
+ *    language governing rights and limitations under the License.
  *
- *	   Software distributed under the License is distributed on
- *	   an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
- *	   express or implied. See the License for the specific
- *	   language governing rights and limitations under the License.
- *
- *	Copyright (c) 2004-2005 Carlos Guzman Alvarez
- *	Copyright (c) 2014-2015 Jiri Cincura (jiri@cincura.net)
- *	All Rights Reserved.
+ *    All Rights Reserved.
  */
+
+//$Authors = Carlos Guzman Alvarez, Jiri Cincura (jiri@cincura.net)
 
 using System;
 using System.Collections.Generic;
@@ -50,7 +48,7 @@ namespace FirebirdSql.Data.FirebirdClient
 		internal const FbServerType DefaultValueServerType = FbServerType.Default;
 		internal const IsolationLevel DefaultValueIsolationLevel = IsolationLevel.ReadCommitted;
 		internal const bool DefaultValueRecordsAffected = true;
-		internal const bool DefaultValueEnlist = false;
+		internal const bool DefaultValueEnlist = true;
 		internal const string DefaultValueClientLibrary = "fbembed";
 		internal const int DefaultValueDbCachePages = 0;
 		internal const bool DefaultValueNoDbTriggers = false;
@@ -201,7 +199,7 @@ namespace FirebirdSql.Data.FirebirdClient
 		public string Charset => GetString(DefaultKeyCharacterSet);
 		public int ConnectionTimeout => GetInt32(DefaultKeyConnectionTimeout);
 		public bool Pooling => GetBoolean(DefaultKeyPooling);
-		public long ConnectionLifeTime => GetInt64(DefaultKeyConnectionLifetime);
+		public long ConnectionLifetime => GetInt64(DefaultKeyConnectionLifetime);
 		public int MinPoolSize => GetInt32(DefaultKeyMinPoolSize);
 		public int MaxPoolSize => GetInt32(DefaultKeyMaxPoolSize);
 		public int FetchSize => GetInt32(DefaultKeyFetchSize);
@@ -255,13 +253,13 @@ namespace FirebirdSql.Data.FirebirdClient
 
 			if (connectionString != null && connectionString.Length > 0)
 			{
-				MatchCollection keyPairs = Regex.Matches(connectionString, KeyPairsRegex);
+				var keyPairs = Regex.Matches(connectionString, KeyPairsRegex);
 
 				foreach (Match keyPair in keyPairs)
 				{
 					if (keyPair.Groups.Count == 8)
 					{
-						string[] values = new string[]
+						var values = new string[]
 						{
 							(keyPair.Groups[2].Success ? keyPair.Groups[2].Value
 								: keyPair.Groups[4].Success ? keyPair.Groups[4].Value
@@ -387,7 +385,7 @@ namespace FirebirdSql.Data.FirebirdClient
 				portSepChar = '/';
 			}
 
-			int sep = connectInfo.IndexOf(hostSepChar);
+			var sep = connectInfo.IndexOf(hostSepChar);
 			if (sep == 0 || sep == connectInfo.Length - 1)
 			{
 				throw new ArgumentException("An invalid connection string argument has been supplied or a required connection string argument has not been supplied.");
@@ -396,7 +394,7 @@ namespace FirebirdSql.Data.FirebirdClient
 			{
 				dataSource = connectInfo.Substring(0, sep);
 				database = connectInfo.Substring(sep + 1);
-				int portSep = dataSource.IndexOf(portSepChar);
+				var portSep = dataSource.IndexOf(portSepChar);
 
 				if (portSep == 0 || portSep == dataSource.Length - 1)
 				{

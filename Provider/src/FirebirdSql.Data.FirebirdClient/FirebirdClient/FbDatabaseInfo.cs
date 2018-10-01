@@ -1,27 +1,27 @@
 ﻿/*
- *  Firebird ADO.NET Data provider for .NET and Mono
+ *    The contents of this file are subject to the Initial
+ *    Developer's Public License Version 1.0 (the "License");
+ *    you may not use this file except in compliance with the
+ *    License. You may obtain a copy of the License at
+ *    https://github.com/FirebirdSQL/NETProvider/blob/master/license.txt.
  *
- *     The contents of this file are subject to the Initial
- *     Developer's Public License Version 1.0 (the "License");
- *     you may not use this file except in compliance with the
- *     License. You may obtain a copy of the License at
- *     http://www.firebirdsql.org/index.php?op=doc&id=idpl
+ *    Software distributed under the License is distributed on
+ *    an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
+ *    express or implied. See the License for the specific
+ *    language governing rights and limitations under the License.
  *
- *     Software distributed under the License is distributed on
- *     an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
- *     express or implied.  See the License for the specific
- *     language governing rights and limitations under the License.
- *
- *  Copyright (c) 2002, 2007 Carlos Guzman Alvarez
- *  All Rights Reserved.
+ *    All Rights Reserved.
  */
+
+//$Authors = Carlos Guzman Alvarez
 
 using System;
 using System.Text;
 using System.Data;
-using System.Collections;
 
 using FirebirdSql.Data.Common;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace FirebirdSql.Data.FirebirdClient
 {
@@ -216,9 +216,9 @@ namespace FirebirdSql.Data.FirebirdClient
 			get { return GetInt32(IscCodes.isc_info_active_transactions); }
 		}
 
-		public ArrayList ActiveUsers
+		public List<string> ActiveUsers
 		{
-			get { return GetArrayList(IscCodes.isc_info_user_names); }
+			get { return GetList<string>(IscCodes.isc_info_user_names); }
 		}
 
 		#endregion
@@ -242,8 +242,8 @@ namespace FirebirdSql.Data.FirebirdClient
 		{
 			FbConnection.EnsureOpen(_connection);
 
-			IDatabase db = Connection.InnerConnection.Database;
-			byte[] items = new byte[]
+			var db = Connection.InnerConnection.Database;
+			var items = new byte[]
 				{
 					item,
 					IscCodes.isc_info_end
@@ -256,14 +256,14 @@ namespace FirebirdSql.Data.FirebirdClient
 		{
 			FbConnection.EnsureOpen(_connection);
 
-			IDatabase db = Connection.InnerConnection.Database;
-			byte[] items = new byte[]
+			var db = Connection.InnerConnection.Database;
+			var items = new byte[]
 				{
 					item,
 					IscCodes.isc_info_end
 				};
 
-			ArrayList info = db.GetDatabaseInfo(items);
+			var info = db.GetDatabaseInfo(items);
 
 			return (info.Count > 0 ? (int)info[0] : 0);
 		}
@@ -272,30 +272,30 @@ namespace FirebirdSql.Data.FirebirdClient
 		{
 			FbConnection.EnsureOpen(_connection);
 
-			IDatabase db = Connection.InnerConnection.Database;
-			byte[] items = new byte[]
+			var db = Connection.InnerConnection.Database;
+			var items = new byte[]
 				{
 					item,
 					IscCodes.isc_info_end
 				};
 
-			ArrayList info = db.GetDatabaseInfo(items);
+			var info = db.GetDatabaseInfo(items);
 
 			return (info.Count > 0 ? (bool)info[0] : false);
 		}
 
-		private ArrayList GetArrayList(byte item)
+		private List<T> GetList<T>(byte item)
 		{
 			FbConnection.EnsureOpen(_connection);
 
-			IDatabase db = Connection.InnerConnection.Database;
-			byte[] items = new byte[]
+			var db = Connection.InnerConnection.Database;
+			var items = new byte[]
 				{
 					item,
 					IscCodes.isc_info_end
 				};
 
-			return db.GetDatabaseInfo(items);
+			return db.GetDatabaseInfo(items).Cast<T>().ToList();
 		}
 
 		#endregion

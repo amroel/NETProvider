@@ -1,24 +1,19 @@
-/*
- *	Firebird ADO.NET Data provider for .NET and Mono
+﻿/*
+ *    The contents of this file are subject to the Initial
+ *    Developer's Public License Version 1.0 (the "License");
+ *    you may not use this file except in compliance with the
+ *    License. You may obtain a copy of the License at
+ *    https://github.com/FirebirdSQL/NETProvider/blob/master/license.txt.
  *
- *	   The contents of this file are subject to the Initial
- *	   Developer's Public License Version 1.0 (the "License");
- *	   you may not use this file except in compliance with the
- *	   License. You may obtain a copy of the License at
- *	   http://www.firebirdsql.org/index.php?op=doc&id=idpl
+ *    Software distributed under the License is distributed on
+ *    an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
+ *    express or implied. See the License for the specific
+ *    language governing rights and limitations under the License.
  *
- *	   Software distributed under the License is distributed on
- *	   an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
- *	   express or implied. See the License for the specific
- *	   language governing rights and limitations under the License.
- *
- *	Copyright (c) 2002, 2007 Carlos Guzman Alvarez
- *	All Rights Reserved.
- *
- *  Contributors:
- *    Jiri Cincura (jiri@cincura.net)
- *    Hennadii Zabula
+ *    All Rights Reserved.
  */
+
+//$Authors = Carlos Guzman Alvarez, Jiri Cincura (jiri@cincura.net), Hennadii Zabula
 
 using System;
 using System.Runtime.InteropServices;
@@ -29,20 +24,20 @@ namespace FirebirdSql.Data.Client.Native.Marshalers
 {
 	internal static class XsqldaMarshaler
 	{
-		private static int sizeofXSQLDA = Marshal2.SizeOf<XSQLDA>();
-		private static int sizeofXSQLVAR = Marshal2.SizeOf<XSQLVAR>();
+		private static int sizeofXSQLDA = Marshal.SizeOf<XSQLDA>();
+		private static int sizeofXSQLVAR = Marshal.SizeOf<XSQLVAR>();
 
 		public static void CleanUpNativeData(ref IntPtr pNativeData)
 		{
 			if (pNativeData != IntPtr.Zero)
 			{
-				XSQLDA xsqlda = Marshal2.PtrToStructure<XSQLDA>(pNativeData);
+				var xsqlda = Marshal.PtrToStructure<XSQLDA>(pNativeData);
 
-				Marshal2.DestroyStructure<XSQLDA>(pNativeData);
+				Marshal.DestroyStructure<XSQLDA>(pNativeData);
 
 				for (var i = 0; i < xsqlda.sqln; i++)
 				{
-					IntPtr ptr = GetIntPtr(pNativeData, ComputeLength(i));
+					var ptr = GetIntPtr(pNativeData, ComputeLength(i));
 
 					var sqlvar = new XSQLVAR();
 					MarshalXSQLVARNativeToManaged(ptr, sqlvar, true);
@@ -59,7 +54,7 @@ namespace FirebirdSql.Data.Client.Native.Marshalers
 						sqlvar.sqlind = IntPtr.Zero;
 					}
 
-					Marshal2.DestroyStructure<XSQLVAR>(ptr);
+					Marshal.DestroyStructure<XSQLVAR>(ptr);
 				}
 
 				Marshal.FreeHGlobal(pNativeData);
@@ -101,7 +96,7 @@ namespace FirebirdSql.Data.Client.Native.Marshalers
 					xsqlvar[i].sqldata = Marshal.AllocHGlobal(0);
 				}
 
-				xsqlvar[i].sqlind = Marshal.AllocHGlobal(Marshal2.SizeOf<short>());
+				xsqlvar[i].sqlind = Marshal.AllocHGlobal(Marshal.SizeOf<short>());
 				Marshal.WriteInt16(xsqlvar[i].sqlind, descriptor[i].NullFlag);
 
 				xsqlvar[i].sqlname = GetStringBuffer(charset, descriptor[i].Name);
@@ -143,7 +138,7 @@ namespace FirebirdSql.Data.Client.Native.Marshalers
 
 		public static Descriptor MarshalNativeToManaged(Charset charset, IntPtr pNativeData, bool fetching)
 		{
-			var xsqlda = Marshal2.PtrToStructure<XSQLDA>(pNativeData);
+			var xsqlda = Marshal.PtrToStructure<XSQLDA>(pNativeData);
 
 			var descriptor = new Descriptor(xsqlda.sqln) { ActualCount = xsqlda.sqld };
 
@@ -183,7 +178,7 @@ namespace FirebirdSql.Data.Client.Native.Marshalers
 		{
 			unsafe
 			{
-				using (BinaryReader reader = new BinaryReader(new UnmanagedMemoryStream((byte*)ptr.ToPointer(), sizeofXSQLVAR)))
+				using (var reader = new BinaryReader(new UnmanagedMemoryStream((byte*)ptr.ToPointer(), sizeofXSQLVAR)))
 				{
 					if (!onlyPointers) xsqlvar.sqltype = reader.ReadInt16(); else reader.BaseStream.Position += sizeof(short);
 					if (!onlyPointers) xsqlvar.sqlscale = reader.ReadInt16(); else reader.BaseStream.Position += sizeof(short);

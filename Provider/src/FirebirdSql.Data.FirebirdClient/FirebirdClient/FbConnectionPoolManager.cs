@@ -1,20 +1,19 @@
 ﻿/*
- *  Firebird ADO.NET Data provider for .NET and Mono
+ *    The contents of this file are subject to the Initial
+ *    Developer's Public License Version 1.0 (the "License");
+ *    you may not use this file except in compliance with the
+ *    License. You may obtain a copy of the License at
+ *    https://github.com/FirebirdSQL/NETProvider/blob/master/license.txt.
  *
- *     The contents of this file are subject to the Initial
- *     Developer's Public License Version 1.0 (the "License");
- *     you may not use this file except in compliance with the
- *     License. You may obtain a copy of the License at
- *     http://www.firebirdsql.org/index.php?op=doc&id=idpl
+ *    Software distributed under the License is distributed on
+ *    an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
+ *    express or implied. See the License for the specific
+ *    language governing rights and limitations under the License.
  *
- *     Software distributed under the License is distributed on
- *     an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
- *     express or implied.  See the License for the specific
- *     language governing rights and limitations under the License.
- *
- *  Copyright (c) 2013-2017 Jiri Cincura (jiri@cincura.net)
- *  All Rights Reserved.
+ *    All Rights Reserved.
  */
+
+//$Authors = Jiri Cincura (jiri@cincura.net)
 
 using System;
 using System.Collections.Concurrent;
@@ -55,7 +54,7 @@ namespace FirebirdSql.Data.FirebirdClient
 					if (_disposed)
 						return;
 					_disposed = true;
-					Created = default(long);
+					Created = default;
 					Connection.Dispose();
 					Connection = null;
 				}
@@ -128,7 +127,7 @@ namespace FirebirdSql.Data.FirebirdClient
 					var available = _available.ToArray();
 					if (available.Count() <= _connectionString.MinPoolSize)
 						return;
-					var keep = available.Where(x => IsAlive(_connectionString.ConnectionLifeTime, x.Created, now)).ToArray();
+					var keep = available.Where(x => ConnectionPoolLifetimeHelper.IsAlive(_connectionString.ConnectionLifetime, x.Created, now)).ToArray();
 					var keepCount = keep.Count();
 					if (keepCount < _connectionString.MinPoolSize)
 					{
@@ -148,7 +147,6 @@ namespace FirebirdSql.Data.FirebirdClient
 
 					CleanConnectionsImpl();
 					_available.Clear();
-					_busy.Clear();
 				}
 			}
 
@@ -159,13 +157,6 @@ namespace FirebirdSql.Data.FirebirdClient
 				return result;
 			}
 
-			static bool IsAlive(long connectionLifeTime, long created, long now)
-			{
-				if (connectionLifeTime == 0)
-					return true;
-				return (now - created) > (connectionLifeTime * 1000);
-			}
-
 			static long GetTicks()
 			{
 				var ticks = Environment.TickCount;
@@ -174,17 +165,8 @@ namespace FirebirdSql.Data.FirebirdClient
 
 			void CleanConnectionsImpl()
 			{
-				Parallel.Invoke(
-					() =>
-					{
-						foreach (var item in _available)
-							item.Dispose();
-					},
-					() =>
-					{
-						foreach (var item in _busy)
-							item.Dispose();
-					});
+				foreach (var item in _available)
+					item.Dispose();
 			}
 
 			void CheckDisposedImpl()
@@ -209,7 +191,7 @@ namespace FirebirdSql.Data.FirebirdClient
 		{
 			_disposed = 0;
 			_pools = new ConcurrentDictionary<string, Pool>();
-			_cleanupTimer = new Timer(CleanupCallback, null, TimeSpan.FromSeconds(2), TimeoutHelper.InfiniteTimeSpan);
+			_cleanupTimer = new Timer(CleanupCallback, null, TimeSpan.FromSeconds(2), Timeout.InfiniteTimeSpan);
 		}
 
 		internal FbConnectionInternal Get(FbConnectionString connectionString, FbConnection owner)
@@ -255,15 +237,15 @@ namespace FirebirdSql.Data.FirebirdClient
 
 		void CleanupCallback(object o)
 		{
-			if (Volatile2.Read(ref _disposed) == 1)
+			if (Volatile.Read(ref _disposed) == 1)
 				return;
 			_pools.Values.AsParallel().ForAll(x => x.CleanupPool());
-			_cleanupTimer.Change(TimeSpan.FromSeconds(2), TimeoutHelper.InfiniteTimeSpan);
+			_cleanupTimer.Change(TimeSpan.FromSeconds(2), Timeout.InfiniteTimeSpan);
 		}
 
 		void CheckDisposed()
 		{
-			if (Volatile2.Read(ref _disposed) == 1)
+			if (Volatile.Read(ref _disposed) == 1)
 				throw new ObjectDisposedException(nameof(FbConnectionPoolManager));
 		}
 	}

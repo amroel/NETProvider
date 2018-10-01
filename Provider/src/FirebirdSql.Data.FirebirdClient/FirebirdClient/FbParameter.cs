@@ -1,23 +1,19 @@
 ﻿/*
- *	Firebird ADO.NET Data provider for .NET and Mono
+ *    The contents of this file are subject to the Initial
+ *    Developer's Public License Version 1.0 (the "License");
+ *    you may not use this file except in compliance with the
+ *    License. You may obtain a copy of the License at
+ *    https://github.com/FirebirdSQL/NETProvider/blob/master/license.txt.
  *
- *	   The contents of this file are subject to the Initial
- *	   Developer's Public License Version 1.0 (the "License");
- *	   you may not use this file except in compliance with the
- *	   License. You may obtain a copy of the License at
- *	   http://www.firebirdsql.org/index.php?op=doc&id=idpl
+ *    Software distributed under the License is distributed on
+ *    an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
+ *    express or implied. See the License for the specific
+ *    language governing rights and limitations under the License.
  *
- *	   Software distributed under the License is distributed on
- *	   an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
- *	   express or implied. See the License for the specific
- *	   language governing rights and limitations under the License.
- *
- *	Copyright (c) 2002, 2007 Carlos Guzman Alvarez
- *	All Rights Reserved.
- *
- *  Contributors:
- *    Jiri Cincura (jiri@cincura.net)
+ *    All Rights Reserved.
  */
+
+//$Authors = Carlos Guzman Alvarez, Jiri Cincura (jiri@cincura.net)
 
 using System;
 using System.Data;
@@ -83,7 +79,7 @@ namespace FirebirdSql.Data.FirebirdClient
 			set
 			{
 				if (value < 0)
-					throw new ArgumentOutOfRangeException("Size");
+					throw new ArgumentOutOfRangeException();
 
 				_size = value;
 
@@ -202,11 +198,7 @@ namespace FirebirdSql.Data.FirebirdClient
 
 		[Category("Data")]
 		[DefaultValue((byte)0)]
-#if NET40
-		public byte Precision
-#else
 		public override byte Precision
-#endif
 		{
 			get { return _precision; }
 			set { _precision = value; }
@@ -214,11 +206,7 @@ namespace FirebirdSql.Data.FirebirdClient
 
 		[Category("Data")]
 		[DefaultValue((byte)0)]
-#if NET40
-		public byte Scale
-#else
 		public override byte Scale
-#endif
 		{
 			get { return _scale; }
 			set { _scale = value; }
@@ -253,15 +241,15 @@ namespace FirebirdSql.Data.FirebirdClient
 		{
 			get
 			{
-				string svalue = (_value as string);
+				var svalue = (_value as string);
 				if (svalue != null)
 				{
 					return svalue.Substring(0, Math.Min(Size, svalue.Length));
 				}
-				byte[] bvalue = (_value as byte[]);
+				var bvalue = (_value as byte[]);
 				if (bvalue != null)
 				{
-					byte[] result = new byte[Math.Min(Size, bvalue.Length)];
+					var result = new byte[Math.Min(Size, bvalue.Length)];
 					Array.Copy(bvalue, result, result.Length);
 					return result;
 				}
@@ -271,7 +259,7 @@ namespace FirebirdSql.Data.FirebirdClient
 
 		internal bool HasSize
 		{
-			get { return _size != default(int); }
+			get { return _size != default; }
 		}
 
 		#endregion
@@ -404,7 +392,7 @@ namespace FirebirdSql.Data.FirebirdClient
 				value = DBNull.Value;
 			}
 
-			TypeCode code = Type.GetTypeCode(value.GetType());
+			var code = Type.GetTypeCode(value.GetType());
 
 			switch (code)
 			{
@@ -482,12 +470,12 @@ namespace FirebirdSql.Data.FirebirdClient
 		{
 			get
 			{
-				string svalue = (_value as string);
+				var svalue = (_value as string);
 				if (svalue != null)
 				{
 					return svalue.Length;
 				}
-				byte[] bvalue = (_value as byte[]);
+				var bvalue = (_value as byte[]);
 				if (bvalue != null)
 				{
 					return bvalue.Length;

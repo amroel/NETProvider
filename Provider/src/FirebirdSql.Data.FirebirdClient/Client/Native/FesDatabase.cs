@@ -1,31 +1,27 @@
 ﻿/*
- *	Firebird ADO.NET Data provider for .NET and Mono
+ *    The contents of this file are subject to the Initial
+ *    Developer's Public License Version 1.0 (the "License");
+ *    you may not use this file except in compliance with the
+ *    License. You may obtain a copy of the License at
+ *    https://github.com/FirebirdSQL/NETProvider/blob/master/license.txt.
  *
- *	   The contents of this file are subject to the Initial
- *	   Developer's Public License Version 1.0 (the "License");
- *	   you may not use this file except in compliance with the
- *	   License. You may obtain a copy of the License at
- *	   http://www.firebirdsql.org/index.php?op=doc&id=idpl
+ *    Software distributed under the License is distributed on
+ *    an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
+ *    express or implied. See the License for the specific
+ *    language governing rights and limitations under the License.
  *
- *	   Software distributed under the License is distributed on
- *	   an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
- *	   express or implied. See the License for the specific
- *	   language governing rights and limitations under the License.
- *
- *	Copyright (c) 2002, 2007 Carlos Guzman Alvarez
- *	All Rights Reserved.
- *
- *  Contributors:
- *      Jiri Cincura (jiri@cincura.net)
+ *    All Rights Reserved.
  */
 
+//$Authors = Carlos Guzman Alvarez, Jiri Cincura (jiri@cincura.net)
+
 using System;
-using System.Collections;
 using System.Threading;
 using System.Text;
 
 using FirebirdSql.Data.Common;
 using FirebirdSql.Data.Client.Native.Handle;
+using System.Collections.Generic;
 
 namespace FirebirdSql.Data.Client.Native
 {
@@ -33,7 +29,7 @@ namespace FirebirdSql.Data.Client.Native
 	{
 		#region Callbacks
 
-		public WarningMessageCallback WarningMessage
+		public Action<IscException> WarningMessage
 		{
 			get { return _warningMessage; }
 			set { _warningMessage = value; }
@@ -43,7 +39,7 @@ namespace FirebirdSql.Data.Client.Native
 
 		#region Fields
 
-		private WarningMessageCallback _warningMessage;
+		private Action<IscException> _warningMessage;
 
 		private DatabaseHandle _handle;
 		private int _transactionCount;
@@ -109,6 +105,11 @@ namespace FirebirdSql.Data.Client.Native
 			get { return _fbClient; }
 		}
 
+		public bool ConnectionBroken
+		{
+			get { return false; }
+		}
+
 		#endregion
 
 		#region Constructors
@@ -117,7 +118,7 @@ namespace FirebirdSql.Data.Client.Native
 		{
 			_fbClient = FbClientFactory.GetFbClient(dllName);
 			_handle = new DatabaseHandle();
-			_charset = (charset != null ? charset : Charset.DefaultCharset);
+			_charset = charset ?? Charset.DefaultCharset;
 			_dialect = 3;
 			_packetSize = 8192;
 			_statusVector = new IntPtr[IscCodes.ISC_STATUS_LENGTH];
@@ -148,9 +149,11 @@ namespace FirebirdSql.Data.Client.Native
 
 		#region Database Methods
 
-		public void CreateDatabase(DatabaseParameterBuffer dpb, string dataSource, int port, string database)
+		public void CreateDatabase(DatabaseParameterBuffer dpb, string dataSource, int port, string database, byte[] cryptKey)
 		{
-			byte[] databaseBuffer = Encoding2.Default.GetBytes(database);
+			CheckCryptKeyForSupport(cryptKey);
+
+			var databaseBuffer = Encoding2.Default.GetBytes(database);
 
 			ClearStatusVector();
 
@@ -204,11 +207,9 @@ namespace FirebirdSql.Data.Client.Native
 
 		public void Attach(DatabaseParameterBuffer dpb, string dataSource, int port, string database, byte[] cryptKey)
 		{
-			// ICryptKeyCallbackImpl would have to be passed from C# for 'cryptKey' passing
-			if (cryptKey?.Length > 0)
-				throw new NotSupportedException("Passing Encryption Key isn't, yet, supported on Firebird Embedded.");
+			CheckCryptKeyForSupport(cryptKey);
 
-			byte[] databaseBuffer = Encoding2.Default.GetBytes(database);
+			var databaseBuffer = Encoding2.Default.GetBytes(database);
 
 			ClearStatusVector();
 
@@ -250,7 +251,7 @@ namespace FirebirdSql.Data.Client.Native
 
 		public TransactionBase BeginTransaction(TransactionParameterBuffer tpb)
 		{
-			FesTransaction transaction = new FesTransaction(this);
+			var transaction = new FesTransaction(this);
 			transaction.BeginTransaction(tpb);
 
 			return transaction;
@@ -262,7 +263,7 @@ namespace FirebirdSql.Data.Client.Native
 
 		public void CancelOperation(int kind)
 		{
-			IntPtr[] localStatusVector = new IntPtr[IscCodes.ISC_STATUS_LENGTH];
+			var localStatusVector = new IntPtr[IscCodes.ISC_STATUS_LENGTH];
 
 			_fbClient.fb_cancel_operation(localStatusVector, ref _handle, kind);
 
@@ -289,7 +290,7 @@ namespace FirebirdSql.Data.Client.Native
 
 		public string GetServerVersion()
 		{
-			byte[] items = new byte[]
+			var items = new byte[]
 			{
 				IscCodes.isc_info_firebird_version,
 				IscCodes.isc_info_end
@@ -298,14 +299,14 @@ namespace FirebirdSql.Data.Client.Native
 			return GetDatabaseInfo(items, IscCodes.BUFFER_SIZE_128)[0].ToString();
 		}
 
-		public ArrayList GetDatabaseInfo(byte[] items)
+		public List<object> GetDatabaseInfo(byte[] items)
 		{
 			return GetDatabaseInfo(items, IscCodes.DEFAULT_MAX_BUFFER_SIZE);
 		}
 
-		public ArrayList GetDatabaseInfo(byte[] items, int bufferLength)
+		public List<object> GetDatabaseInfo(byte[] items, int bufferLength)
 		{
-			byte[] buffer = new byte[bufferLength];
+			var buffer = new byte[bufferLength];
 
 			DatabaseInfo(items, buffer, buffer.Length);
 
@@ -318,7 +319,7 @@ namespace FirebirdSql.Data.Client.Native
 
 		internal void ProcessStatusVector(IntPtr[] statusVector)
 		{
-			IscException ex = FesConnection.ParseStatusVector(statusVector, _charset);
+			var ex = FesConnection.ParseStatusVector(statusVector, _charset);
 
 			if (ex != null)
 			{
@@ -355,6 +356,17 @@ namespace FirebirdSql.Data.Client.Native
 				buffer);
 
 			ProcessStatusVector(_statusVector);
+		}
+
+		#endregion
+
+		#region Internal Static Methods
+
+		internal static void CheckCryptKeyForSupport(byte[] cryptKey)
+		{
+			// ICryptKeyCallbackImpl would have to be passed from C# for 'cryptKey' passing
+			if (cryptKey?.Length > 0)
+				throw new NotSupportedException("Passing Encryption Key isn't, yet, supported on Firebird Embedded.");
 		}
 
 		#endregion

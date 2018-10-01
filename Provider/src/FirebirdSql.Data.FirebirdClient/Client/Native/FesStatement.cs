@@ -1,26 +1,22 @@
 ﻿/*
- *	Firebird ADO.NET Data provider for .NET and Mono
+ *    The contents of this file are subject to the Initial
+ *    Developer's Public License Version 1.0 (the "License");
+ *    you may not use this file except in compliance with the
+ *    License. You may obtain a copy of the License at
+ *    https://github.com/FirebirdSQL/NETProvider/blob/master/license.txt.
  *
- *	   The contents of this file are subject to the Initial
- *	   Developer's Public License Version 1.0 (the "License");
- *	   you may not use this file except in compliance with the
- *	   License. You may obtain a copy of the License at
- *	   http://www.firebirdsql.org/index.php?op=doc&id=idpl
+ *    Software distributed under the License is distributed on
+ *    an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
+ *    express or implied. See the License for the specific
+ *    language governing rights and limitations under the License.
  *
- *	   Software distributed under the License is distributed on
- *	   an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
- *	   express or implied. See the License for the specific
- *	   language governing rights and limitations under the License.
- *
- *	Copyright (c) 2002, 2007 Carlos Guzman Alvarez
- *	All Rights Reserved.
- *
- *  Contributors:
- *      Jiri Cincura (jiri@cincura.net)
+ *    All Rights Reserved.
  */
 
+//$Authors = Carlos Guzman Alvarez, Jiri Cincura (jiri@cincura.net)
+
 using System;
-using System.Collections;
+using System.Collections.Generic;
 using System.Text;
 
 using FirebirdSql.Data.Common;
@@ -42,7 +38,7 @@ namespace FirebirdSql.Data.Client.Native
 		private StatementState _state;
 		private DbStatementType _statementType;
 		private bool _allRowsFetched;
-		private Queue _outputParams;
+		private Queue<DbValue[]> _outputParams;
 		private int _recordsAffected;
 		private bool _returnRecordsAffected;
 		private IntPtr[] _statusVector;
@@ -159,7 +155,7 @@ namespace FirebirdSql.Data.Client.Native
 			_recordsAffected = -1;
 			_db = (FesDatabase)db;
 			_handle = new StatementHandle();
-			_outputParams = new Queue();
+			_outputParams = new Queue<DbValue[]>();
 			_statusVector = new IntPtr[IscCodes.ISC_STATUS_LENGTH];
 			_fetchSqlDa = IntPtr.Zero;
 
@@ -260,10 +256,10 @@ namespace FirebirdSql.Data.Client.Native
 
 			_fields = new Descriptor(1);
 
-			IntPtr sqlda = XsqldaMarshaler.MarshalManagedToNative(_db.Charset, _fields);
-			TransactionHandle trHandle = _transaction.HandlePtr;
+			var sqlda = XsqldaMarshaler.MarshalManagedToNative(_db.Charset, _fields);
+			var trHandle = _transaction.HandlePtr;
 
-			byte[] buffer = _db.Charset.GetBytes(commandText);
+			var buffer = _db.Charset.GetBytes(commandText);
 
 			_db.FbClient.isc_dsql_prepare(
 				_statusVector,
@@ -274,7 +270,7 @@ namespace FirebirdSql.Data.Client.Native
 				_db.Dialect,
 				sqlda);
 
-			Descriptor descriptor = XsqldaMarshaler.MarshalNativeToManaged(_db.Charset, sqlda);
+			var descriptor = XsqldaMarshaler.MarshalNativeToManaged(_db.Charset, sqlda);
 
 			XsqldaMarshaler.CleanUpNativeData(ref sqlda);
 
@@ -310,8 +306,8 @@ namespace FirebirdSql.Data.Client.Native
 
 			ClearStatusVector();
 
-			IntPtr inSqlda = IntPtr.Zero;
-			IntPtr outSqlda = IntPtr.Zero;
+			var inSqlda = IntPtr.Zero;
+			var outSqlda = IntPtr.Zero;
 
 			if (_parameters != null)
 			{
@@ -323,7 +319,7 @@ namespace FirebirdSql.Data.Client.Native
 				outSqlda = XsqldaMarshaler.MarshalManagedToNative(_db.Charset, _fields);
 			}
 
-			TransactionHandle trHandle = _transaction.HandlePtr;
+			var trHandle = _transaction.HandlePtr;
 
 			_db.FbClient.isc_dsql_execute2(
 				_statusVector,
@@ -335,11 +331,11 @@ namespace FirebirdSql.Data.Client.Native
 
 			if (outSqlda != IntPtr.Zero)
 			{
-				Descriptor descriptor = XsqldaMarshaler.MarshalNativeToManaged(_db.Charset, outSqlda, true);
+				var descriptor = XsqldaMarshaler.MarshalNativeToManaged(_db.Charset, outSqlda, true);
 
-				DbValue[] values = new DbValue[descriptor.Count];
+				var values = new DbValue[descriptor.Count];
 
-				for (int i = 0; i < values.Length; i++)
+				for (var i = 0; i < values.Length; i++)
 				{
 					values[i] = new DbValue(this, descriptor[i]);
 				}
@@ -365,8 +361,16 @@ namespace FirebirdSql.Data.Client.Native
 			{
 				throw new InvalidOperationException("Statement is not correctly created.");
 			}
-			if (_statementType != DbStatementType.Select &&
-				_statementType != DbStatementType.SelectForUpdate)
+			if (_statementType == DbStatementType.StoredProcedure && !_allRowsFetched)
+			{
+				_allRowsFetched = true;
+				return GetOutputParameters();
+			}
+			else if (_statementType == DbStatementType.Insert && _allRowsFetched)
+			{
+				return null;
+			}
+			else if (_statementType != DbStatementType.Select && _statementType != DbStatementType.SelectForUpdate)
 			{
 				return null;
 			}
@@ -382,13 +386,13 @@ namespace FirebirdSql.Data.Client.Native
 
 				ClearStatusVector();
 
-				IntPtr status = _db.FbClient.isc_dsql_fetch(_statusVector, ref _handle, IscCodes.SQLDA_VERSION1, _fetchSqlDa);
+				var status = _db.FbClient.isc_dsql_fetch(_statusVector, ref _handle, IscCodes.SQLDA_VERSION1, _fetchSqlDa);
 
-				Descriptor rowDesc = XsqldaMarshaler.MarshalNativeToManaged(_db.Charset, _fetchSqlDa, true);
+				var rowDesc = XsqldaMarshaler.MarshalNativeToManaged(_db.Charset, _fetchSqlDa, true);
 
 				if (_fields.Count == rowDesc.Count)
 				{
-					for (int i = 0; i < _fields.Count; i++)
+					for (var i = 0; i < _fields.Count; i++)
 					{
 						if (_fields[i].IsArray() && _fields[i].ArrayHandle != null)
 						{
@@ -410,7 +414,7 @@ namespace FirebirdSql.Data.Client.Native
 				else
 				{
 					row = new DbValue[_fields.ActualCount];
-					for (int i = 0; i < row.Length; i++)
+					for (var i = 0; i < row.Length; i++)
 					{
 						row[i] = new DbValue(this, _fields[i]);
 					}
@@ -424,7 +428,7 @@ namespace FirebirdSql.Data.Client.Native
 		{
 			if (_outputParams != null && _outputParams.Count > 0)
 			{
-				return (DbValue[])_outputParams.Dequeue();
+				return _outputParams.Dequeue();
 			}
 
 			return null;
@@ -436,7 +440,7 @@ namespace FirebirdSql.Data.Client.Native
 
 			_fields = new Descriptor(_fields.ActualCount);
 
-			IntPtr sqlda = XsqldaMarshaler.MarshalManagedToNative(_db.Charset, _fields);
+			var sqlda = XsqldaMarshaler.MarshalManagedToNative(_db.Charset, _fields);
 
 
 			_db.FbClient.isc_dsql_describe(
@@ -445,7 +449,7 @@ namespace FirebirdSql.Data.Client.Native
 				IscCodes.SQLDA_VERSION1,
 				sqlda);
 
-			Descriptor descriptor = XsqldaMarshaler.MarshalNativeToManaged(_db.Charset, sqlda);
+			var descriptor = XsqldaMarshaler.MarshalNativeToManaged(_db.Charset, sqlda);
 
 			XsqldaMarshaler.CleanUpNativeData(ref sqlda);
 
@@ -460,7 +464,7 @@ namespace FirebirdSql.Data.Client.Native
 
 			_parameters = new Descriptor(1);
 
-			IntPtr sqlda = XsqldaMarshaler.MarshalManagedToNative(_db.Charset, _parameters);
+			var sqlda = XsqldaMarshaler.MarshalManagedToNative(_db.Charset, _parameters);
 
 
 			_db.FbClient.isc_dsql_describe_bind(
@@ -469,13 +473,13 @@ namespace FirebirdSql.Data.Client.Native
 				IscCodes.SQLDA_VERSION1,
 				sqlda);
 
-			Descriptor descriptor = XsqldaMarshaler.MarshalNativeToManaged(_db.Charset, sqlda);
+			var descriptor = XsqldaMarshaler.MarshalNativeToManaged(_db.Charset, sqlda);
 
 			_db.ProcessStatusVector(_statusVector);
 
 			if (descriptor.ActualCount != 0 && descriptor.Count != descriptor.ActualCount)
 			{
-				short n = descriptor.ActualCount;
+				var n = descriptor.ActualCount;
 				descriptor = new Descriptor(n);
 
 				XsqldaMarshaler.CleanUpNativeData(ref sqlda);
@@ -558,7 +562,7 @@ namespace FirebirdSql.Data.Client.Native
 		{
 			ClearStatusVector();
 
-			byte[] buffer = new byte[bufferLength];
+			var buffer = new byte[bufferLength];
 
 
 			_db.FbClient.isc_dsql_sql_info(
@@ -585,10 +589,7 @@ namespace FirebirdSql.Data.Client.Native
 
 		private void Clear()
 		{
-			if (_outputParams != null && _outputParams.Count > 0)
-			{
-				_outputParams.Clear();
-			}
+			_outputParams?.Clear();
 		}
 
 		private void ClearAll()
@@ -603,7 +604,7 @@ namespace FirebirdSql.Data.Client.Native
 		{
 			ClearStatusVector();
 
-			DatabaseHandle dbHandle = _db.HandlePtr;
+			var dbHandle = _db.HandlePtr;
 
 			_db.FbClient.isc_dsql_allocate_statement(
 				_statusVector,

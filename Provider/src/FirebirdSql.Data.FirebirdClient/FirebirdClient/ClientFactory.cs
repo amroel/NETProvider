@@ -1,21 +1,19 @@
 ﻿/*
- *  Firebird ADO.NET Data provider for .NET and Mono
+ *    The contents of this file are subject to the Initial
+ *    Developer's Public License Version 1.0 (the "License");
+ *    you may not use this file except in compliance with the
+ *    License. You may obtain a copy of the License at
+ *    https://github.com/FirebirdSQL/NETProvider/blob/master/license.txt.
  *
- *     The contents of this file are subject to the Initial
- *     Developer's Public License Version 1.0 (the "License");
- *     you may not use this file except in compliance with the
- *     License. You may obtain a copy of the License at
- *     http://www.firebirdsql.org/index.php?op=doc&id=idpl
+ *    Software distributed under the License is distributed on
+ *    an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
+ *    express or implied. See the License for the specific
+ *    language governing rights and limitations under the License.
  *
- *     Software distributed under the License is distributed on
- *     an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
- *     express or implied.  See the License for the specific
- *     language governing rights and limitations under the License.
- *
- *  Copyright (c) 2002, 2007 Carlos Guzman Alvarez
- *  Copyright (c) 2016 Jiri Cincura (jiri@cincura.net)
- *  All Rights Reserved.
+ *    All Rights Reserved.
  */
+
+//$Authors = Carlos Guzman Alvarez, Jiri Cincura (jiri@cincura.net)
 
 using System;
 using FirebirdSql.Data.Client.Managed;
@@ -85,8 +83,11 @@ namespace FirebirdSql.Data.FirebirdClient
 			switch (connection.ProtocolVersion)
 			{
 				case IscCodes.PROTOCOL_VERSION13:
+					return new Client.Managed.Version13.GdsServiceManager(connection);
 				case IscCodes.PROTOCOL_VERSION12:
+					return new Client.Managed.Version12.GdsServiceManager(connection);
 				case IscCodes.PROTOCOL_VERSION11:
+					return new Client.Managed.Version11.GdsServiceManager(connection);
 				case IscCodes.PROTOCOL_VERSION10:
 					return new Client.Managed.Version10.GdsServiceManager(connection);
 				default:

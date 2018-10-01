@@ -1,23 +1,19 @@
 ﻿/*
- *	Firebird ADO.NET Data provider for .NET and Mono
+ *    The contents of this file are subject to the Initial
+ *    Developer's Public License Version 1.0 (the "License");
+ *    you may not use this file except in compliance with the
+ *    License. You may obtain a copy of the License at
+ *    https://github.com/FirebirdSQL/NETProvider/blob/master/license.txt.
  *
- *	   The contents of this file are subject to the Initial
- *	   Developer's Public License Version 1.0 (the "License");
- *	   you may not use this file except in compliance with the
- *	   License. You may obtain a copy of the License at
- *	   http://www.firebirdsql.org/index.php?op=doc&id=idpl
+ *    Software distributed under the License is distributed on
+ *    an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
+ *    express or implied. See the License for the specific
+ *    language governing rights and limitations under the License.
  *
- *	   Software distributed under the License is distributed on
- *	   an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
- *	   express or implied. See the License for the specific
- *	   language governing rights and limitations under the License.
- *
- *	Copyright (c) 2002, 2007 Carlos Guzman Alvarez
- *	All Rights Reserved.
- *
- *  Contributors:
- *      Jiri Cincura (jiri@cincura.net)
+ *    All Rights Reserved.
  */
+
+//$Authors = Carlos Guzman Alvarez, Jiri Cincura (jiri@cincura.net)
 
 using System;
 using System.Collections.Generic;
@@ -68,7 +64,7 @@ namespace FirebirdSql.Data.Common
 				throw new ArgumentOutOfRangeException(nameof(events), "Need to provide at least one event.");
 			if (events.Any(x => x.Length > MaxEventNameLength))
 				throw new ArgumentOutOfRangeException(nameof(events), $"Some events are longer than {MaxEventNameLength}.");
-			if (BuildEpb(events.ToList(), _ => default(int)).ToArray().Length > MaxEpbLength)
+			if (BuildEpb(events.ToList(), _ => default).ToArray().Length > MaxEpbLength)
 				throw new ArgumentOutOfRangeException(nameof(events), $"Whole events buffer is bigger than {MaxEpbLength}.");
 			_events.AddRange(events);
 			QueueEventsImpl();
@@ -80,7 +76,7 @@ namespace FirebirdSql.Data.Common
 			_currentCounts = null;
 			_previousCounts = null;
 			_events.Clear();
-			Volatile2.Write(ref _running, 0);
+			Volatile.Write(ref _running, 0);
 		}
 
 		void QueueEventsImpl()
@@ -90,7 +86,7 @@ namespace FirebirdSql.Data.Common
 
 		internal void EventCounts(byte[] buffer)
 		{
-			if (Volatile2.Read(ref _running) == 0)
+			if (Volatile.Read(ref _running) == 0)
 				return;
 
 			_previousCounts = _currentCounts;

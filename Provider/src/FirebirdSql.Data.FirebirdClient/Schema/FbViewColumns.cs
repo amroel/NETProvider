@@ -1,23 +1,19 @@
 ﻿/*
- *  Firebird ADO.NET Data provider for .NET and Mono
+ *    The contents of this file are subject to the Initial
+ *    Developer's Public License Version 1.0 (the "License");
+ *    you may not use this file except in compliance with the
+ *    License. You may obtain a copy of the License at
+ *    https://github.com/FirebirdSQL/NETProvider/blob/master/license.txt.
  *
- *     The contents of this file are subject to the Initial
- *     Developer's Public License Version 1.0 (the "License");
- *     you may not use this file except in compliance with the
- *     License. You may obtain a copy of the License at
- *     http://www.firebirdsql.org/index.php?op=doc&id=idpl
+ *    Software distributed under the License is distributed on
+ *    an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
+ *    express or implied. See the License for the specific
+ *    language governing rights and limitations under the License.
  *
- *     Software distributed under the License is distributed on
- *     an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
- *     express or implied.  See the License for the specific
- *     language governing rights and limitations under the License.
- *
- *  Copyright (c) 2002, 2007 Carlos Guzman Alvarez
- *  All Rights Reserved.
- *
- *  Constributors:
- *      Jiri Cincura (jiri@cincura.net)
+ *    All Rights Reserved.
  */
+
+//$Authors = Carlos Guzman Alvarez, Jiri Cincura (jiri@cincura.net)
 
 #if !NETSTANDARD1_6
 using System;
@@ -36,8 +32,8 @@ namespace FirebirdSql.Data.Schema
 
 		protected override StringBuilder GetCommandText(string[] restrictions)
 		{
-			StringBuilder sql = new StringBuilder();
-			StringBuilder where = new StringBuilder();
+			var sql = new StringBuilder();
+			var where = new StringBuilder();
 
 			sql.Append(
 				@"SELECT
@@ -75,7 +71,7 @@ namespace FirebirdSql.Data.Schema
 
 			if (restrictions != null)
 			{
-				int index = 0;
+				var index = 0;
 
 				/* VIEW_CATALOG */
 				if (restrictions.Length >= 1 && restrictions[0] != null)
@@ -90,19 +86,19 @@ namespace FirebirdSql.Data.Schema
 				/* VIEW_NAME */
 				if (restrictions.Length >= 3 && restrictions[2] != null)
 				{
-					where.AppendFormat(CultureInfo.CurrentUICulture, " AND rel.rdb$relation_name = @p{0}", index++);
+					where.AppendFormat(" AND rel.rdb$relation_name = @p{0}", index++);
 				}
 
 				/* COLUMN_NAME */
 				if (restrictions.Length >= 4 && restrictions[3] != null)
 				{
-					where.AppendFormat(CultureInfo.CurrentUICulture, " AND rfr.rdb$field_name = @p{0}", index++);
+					where.AppendFormat(" AND rfr.rdb$field_name = @p{0}", index++);
 				}
 			}
 
 			if (where.Length > 0)
 			{
-				sql.AppendFormat(CultureInfo.CurrentUICulture, " WHERE {0} ", where.ToString());
+				sql.AppendFormat(" WHERE {0} ", where.ToString());
 			}
 
 			sql.Append(" ORDER BY rel.rdb$relation_name, rfr.rdb$field_position");
@@ -118,15 +114,15 @@ namespace FirebirdSql.Data.Schema
 
 			foreach (DataRow row in schema.Rows)
 			{
-				int blrType = Convert.ToInt32(row["FIELD_TYPE"], CultureInfo.InvariantCulture);
+				var blrType = Convert.ToInt32(row["FIELD_TYPE"], CultureInfo.InvariantCulture);
 
-				int subType = 0;
+				var subType = 0;
 				if (row["COLUMN_SUB_TYPE"] != DBNull.Value)
 				{
 					subType = Convert.ToInt32(row["COLUMN_SUB_TYPE"], CultureInfo.InvariantCulture);
 				}
 
-				int scale = 0;
+				var scale = 0;
 				if (row["NUMERIC_SCALE"] != DBNull.Value)
 				{
 					scale = Convert.ToInt32(row["NUMERIC_SCALE"], CultureInfo.InvariantCulture);
@@ -135,7 +131,7 @@ namespace FirebirdSql.Data.Schema
 				row["IS_NULLABLE"] = (row["COLUMN_NULLABLE"] == DBNull.Value);
 				row["IS_ARRAY"] = (row["COLUMN_ARRAY"] != DBNull.Value);
 
-				FbDbType dbType = (FbDbType)TypeHelper.GetDbDataTypeFromBlrType(blrType, subType, scale);
+				var dbType = (FbDbType)TypeHelper.GetDbDataTypeFromBlrType(blrType, subType, scale);
 				row["COLUMN_DATA_TYPE"] = TypeHelper.GetDataTypeName((DbDataType)dbType).ToLower(CultureInfo.InvariantCulture);
 
 				if (dbType == FbDbType.Char || dbType == FbDbType.VarChar)

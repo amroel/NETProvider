@@ -1,23 +1,19 @@
 ﻿/*
- *	Firebird ADO.NET Data provider for .NET and Mono
+ *    The contents of this file are subject to the Initial
+ *    Developer's Public License Version 1.0 (the "License");
+ *    you may not use this file except in compliance with the
+ *    License. You may obtain a copy of the License at
+ *    https://github.com/FirebirdSQL/NETProvider/blob/master/license.txt.
  *
- *	   The contents of this file are subject to the Initial
- *	   Developer's Public License Version 1.0 (the "License");
- *	   you may not use this file except in compliance with the
- *	   License. You may obtain a copy of the License at
- *	   http://www.firebirdsql.org/index.php?op=doc&id=idpl
+ *    Software distributed under the License is distributed on
+ *    an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
+ *    express or implied. See the License for the specific
+ *    language governing rights and limitations under the License.
  *
- *	   Software distributed under the License is distributed on
- *	   an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
- *	   express or implied. See the License for the specific
- *	   language governing rights and limitations under the License.
- *
- *	Copyright (c) 2002, 2007 Carlos Guzman Alvarez
- *	All Rights Reserved.
- *
- * Contributors:
- *   Jiri Cincura (jiri@cincura.net)
+ *    All Rights Reserved.
  */
+
+//$Authors = Carlos Guzman Alvarez, Jiri Cincura (jiri@cincura.net)
 
 using System;
 using System.IO;
@@ -86,8 +82,8 @@ namespace FirebirdSql.Data.Client.Native
 		{
 			ClearStatusVector();
 
-			DatabaseHandle dbHandle = _db.HandlePtr;
-			TransactionHandle trHandle = ((FesTransaction)_transaction).HandlePtr;
+			var dbHandle = _db.HandlePtr;
+			var trHandle = ((FesTransaction)_transaction).HandlePtr;
 
 			_db.FbClient.isc_create_blob2(
 				_statusVector,
@@ -107,8 +103,8 @@ namespace FirebirdSql.Data.Client.Native
 		{
 			ClearStatusVector();
 
-			DatabaseHandle dbHandle = _db.HandlePtr;
-			TransactionHandle trHandle = ((FesTransaction)_transaction).HandlePtr;
+			var dbHandle = _db.HandlePtr;
+			var trHandle = ((FesTransaction)_transaction).HandlePtr;
 
 			_db.FbClient.isc_open_blob2(
 				_statusVector,
@@ -124,16 +120,16 @@ namespace FirebirdSql.Data.Client.Native
 
 		protected override byte[] GetSegment()
 		{
-			short requested = (short)SegmentSize;
+			var requested = (short)SegmentSize;
 			short segmentLength = 0;
 
 			ClearStatusVector();
 
-			using (MemoryStream segment = new MemoryStream())
+			using (var segment = new MemoryStream())
 			{
-				byte[] tmp = new byte[requested];
+				var tmp = new byte[requested];
 
-				IntPtr status = _db.FbClient.isc_get_segment(
+				var status = _db.FbClient.isc_get_segment(
 					_statusVector,
 					ref _blobHandle,
 					ref segmentLength,
@@ -142,7 +138,7 @@ namespace FirebirdSql.Data.Client.Native
 
 				if (segmentLength > 0)
 				{
-					segment.Write(tmp, 0, segmentLength > requested ? requested : segmentLength);
+					segment.Write(tmp, 0, segmentLength);
 				}
 
 				RblRemoveValue(IscCodes.RBL_segment);

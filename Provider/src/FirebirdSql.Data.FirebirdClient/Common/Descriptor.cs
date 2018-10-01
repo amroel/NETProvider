@@ -1,23 +1,19 @@
 ﻿/*
- *  Firebird ADO.NET Data provider for .NET and Mono
+ *    The contents of this file are subject to the Initial
+ *    Developer's Public License Version 1.0 (the "License");
+ *    you may not use this file except in compliance with the
+ *    License. You may obtain a copy of the License at
+ *    https://github.com/FirebirdSQL/NETProvider/blob/master/license.txt.
  *
- *     The contents of this file are subject to the Initial
- *     Developer's Public License Version 1.0 (the "License");
- *     you may not use this file except in compliance with the
- *     License. You may obtain a copy of the License at
- *     http://www.firebirdsql.org/index.php?op=doc&id=idpl
+ *    Software distributed under the License is distributed on
+ *    an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
+ *    express or implied. See the License for the specific
+ *    language governing rights and limitations under the License.
  *
- *     Software distributed under the License is distributed on
- *     an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
- *     express or implied.  See the License for the specific
- *     language governing rights and limitations under the License.
- *
- *  Copyright (c) 2002, 2007 Carlos Guzman Alvarez
- *  All Rights Reserved.
- *
- *  Contributors:
- *      Jiri Cincura (jiri@cincura.net)
+ *    All Rights Reserved.
  */
+
+//$Authors = Carlos Guzman Alvarez, Jiri Cincura (jiri@cincura.net)
 
 using System;
 using System.IO;
@@ -87,7 +83,7 @@ namespace FirebirdSql.Data.Common
 			_actualCount = n;
 			_fields = new DbField[n];
 
-			for (int i = 0; i < n; i++)
+			for (var i = 0; i < n; i++)
 			{
 				_fields[i] = new DbField();
 			}
@@ -99,7 +95,7 @@ namespace FirebirdSql.Data.Common
 
 		public void ResetValues()
 		{
-			for (int i = 0; i < _fields.Length; i++)
+			for (var i = 0; i < _fields.Length; i++)
 			{
 				_fields[i].Value = null;
 			}
@@ -107,9 +103,9 @@ namespace FirebirdSql.Data.Common
 
 		public byte[] ToBlrArray()
 		{
-			using (MemoryStream blr = new MemoryStream())
+			using (var blr = new MemoryStream())
 			{
-				int par_count = Count * 2;
+				var par_count = Count * 2;
 
 				blr.WriteByte(IscCodes.blr_version5);
 				blr.WriteByte(IscCodes.blr_begin);
@@ -118,9 +114,9 @@ namespace FirebirdSql.Data.Common
 				blr.WriteByte((byte)(par_count & 255));
 				blr.WriteByte((byte)(par_count >> 8));
 
-				for (int i = 0; i < _fields.Length; i++)
+				for (var i = 0; i < _fields.Length; i++)
 				{
-					int dtype = _fields[i].SqlType;
+					var dtype = _fields[i].SqlType;
 					int len = _fields[i].Length;
 
 					switch (dtype)

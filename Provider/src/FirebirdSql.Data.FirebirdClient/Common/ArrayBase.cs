@@ -1,23 +1,19 @@
 ﻿/*
- *  Firebird ADO.NET Data provider for .NET and Mono
+ *    The contents of this file are subject to the Initial
+ *    Developer's Public License Version 1.0 (the "License");
+ *    you may not use this file except in compliance with the
+ *    License. You may obtain a copy of the License at
+ *    https://github.com/FirebirdSQL/NETProvider/blob/master/license.txt.
  *
- *     The contents of this file are subject to the Initial
- *     Developer's Public License Version 1.0 (the "License");
- *     you may not use this file except in compliance with the
- *     License. You may obtain a copy of the License at
- *     http://www.firebirdsql.org/index.php?op=doc&id=idpl
+ *    Software distributed under the License is distributed on
+ *    an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
+ *    express or implied. See the License for the specific
+ *    language governing rights and limitations under the License.
  *
- *     Software distributed under the License is distributed on
- *     an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
- *     express or implied.  See the License for the specific
- *     language governing rights and limitations under the License.
- *
- *  Copyright (c) 2002, 2007 Carlos Guzman Alvarez
- *  All Rights Reserved.
- *
- *  Contributors:
- *    Jiri Cincura (jiri@cincura.net)
+ *    All Rights Reserved.
  */
+
+//$Authors = Carlos Guzman Alvarez, Jiri Cincura (jiri@cincura.net)
 
 using System;
 using System.Text;
@@ -45,7 +41,7 @@ namespace FirebirdSql.Data.Common
 		#region Abstract Properties
 
 		public abstract long Handle { get; set; }
-		public abstract IDatabase DB { get; set; }
+		public abstract IDatabase Database { get; set; }
 		public abstract TransactionBase Transaction { get; set; }
 
 		#endregion
@@ -72,7 +68,7 @@ namespace FirebirdSql.Data.Common
 
 		public Array Read()
 		{
-			byte[] slice = GetSlice(GetSliceLength(true));
+			var slice = GetSlice(GetSliceLength(true));
 
 			return DecodeSlice(slice);
 		}
@@ -87,10 +83,10 @@ namespace FirebirdSql.Data.Common
 		{
 			_descriptor.Dimensions = (short)sourceArray.Rank;
 
-			for (int i = 0; i < sourceArray.Rank; i++)
+			for (var i = 0; i < sourceArray.Rank; i++)
 			{
-				int lb = _descriptor.Bounds[i].LowerBound;
-				int ub = sourceArray.GetLength(i) - 1 + lb;
+				var lb = _descriptor.Bounds[i].LowerBound;
+				var ub = sourceArray.GetLength(i) - 1 + lb;
 
 				_descriptor.Bounds[i].UpperBound = ub;
 			}
@@ -100,14 +96,14 @@ namespace FirebirdSql.Data.Common
 		{
 			LookupDesc();
 
-			using (StatementBase lookup = DB.CreateStatement(Transaction))
+			using (var lookup = Database.CreateStatement(Transaction))
 			{
 				lookup.Prepare(GetArrayBounds());
 				lookup.Execute();
 
 				_descriptor.Bounds = new ArrayBound[16];
 				DbValue[] values;
-				int i = 0;
+				var i = 0;
 				while ((values = lookup.Fetch()) != null)
 				{
 					_descriptor.Bounds[i].LowerBound = values[0].GetInt32();
@@ -120,13 +116,13 @@ namespace FirebirdSql.Data.Common
 
 		public void LookupDesc()
 		{
-			using (StatementBase lookup = DB.CreateStatement(Transaction))
+			using (var lookup = Database.CreateStatement(Transaction))
 			{
 				lookup.Prepare(GetArrayDesc());
 				lookup.Execute();
 
 				_descriptor = new ArrayDesc();
-				DbValue[] values = lookup.Fetch();
+				var values = lookup.Fetch();
 				if (values != null && values.Length > 0)
 				{
 					_descriptor.RelationName = _tableName;
@@ -152,14 +148,14 @@ namespace FirebirdSql.Data.Common
 
 		protected int GetSliceLength(bool read)
 		{
-			int elements = 1;
-			for (int i = 0; i < _descriptor.Dimensions; i++)
+			var elements = 1;
+			for (var i = 0; i < _descriptor.Dimensions; i++)
 			{
-				ArrayBound bound = _descriptor.Bounds[i];
+				var bound = _descriptor.Bounds[i];
 				elements *= bound.UpperBound - bound.LowerBound + 1;
 			}
 
-			int length = elements * _descriptor.Length;
+			var length = elements * _descriptor.Length;
 
 			switch (_descriptor.DataType)
 			{
@@ -174,7 +170,7 @@ namespace FirebirdSql.Data.Common
 
 		protected Type GetSystemType()
 		{
-			return TypeHelper.GetTypeFromBlrType(_descriptor.DataType, default(int), _descriptor.Scale);
+			return TypeHelper.GetTypeFromBlrType(_descriptor.DataType, default, _descriptor.Scale);
 		}
 
 		#endregion
@@ -196,7 +192,7 @@ namespace FirebirdSql.Data.Common
 
 		private string GetArrayDesc()
 		{
-			StringBuilder sql = new StringBuilder();
+			var sql = new StringBuilder();
 
 			sql.Append(
 				"SELECT Y.RDB$FIELD_TYPE, Y.RDB$FIELD_SCALE, Y.RDB$FIELD_LENGTH, Y.RDB$DIMENSIONS, X.RDB$FIELD_SOURCE " +
@@ -218,7 +214,7 @@ namespace FirebirdSql.Data.Common
 
 		private string GetArrayBounds()
 		{
-			StringBuilder sql = new StringBuilder();
+			var sql = new StringBuilder();
 
 			sql.Append("SELECT X.RDB$LOWER_BOUND, X.RDB$UPPER_BOUND FROM RDB$FIELD_DIMENSIONS X ");
 

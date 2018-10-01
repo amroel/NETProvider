@@ -1,26 +1,21 @@
 ﻿/*
- *	Firebird ADO.NET Data provider for .NET and Mono
+ *    The contents of this file are subject to the Initial
+ *    Developer's Public License Version 1.0 (the "License");
+ *    you may not use this file except in compliance with the
+ *    License. You may obtain a copy of the License at
+ *    https://github.com/FirebirdSQL/NETProvider/blob/master/license.txt.
  *
- *	   The contents of this file are subject to the Initial
- *	   Developer's Public License Version 1.0 (the "License");
- *	   you may not use this file except in compliance with the
- *	   License. You may obtain a copy of the License at
- *	   http://www.firebirdsql.org/index.php?op=doc&id=idpl
+ *    Software distributed under the License is distributed on
+ *    an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
+ *    express or implied. See the License for the specific
+ *    language governing rights and limitations under the License.
  *
- *	   Software distributed under the License is distributed on
- *	   an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
- *	   express or implied. See the License for the specific
- *	   language governing rights and limitations under the License.
- *
- *	Copyright (c) 2002, 2007 Carlos Guzman Alvarez
- *	All Rights Reserved.
- *
- *  Contributors:
- *   Jiri Cincura (jiri@cincura.net)
+ *    All Rights Reserved.
  */
 
+//$Authors = Carlos Guzman Alvarez, Jiri Cincura (jiri@cincura.net)
+
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -34,6 +29,8 @@ namespace FirebirdSql.Data.Services
 	public abstract class FbService
 	{
 		public event EventHandler<ServiceOutputEventArgs> ServiceOutput;
+
+		public event EventHandler<FbInfoMessageEventArgs> InfoMessage;
 
 		private const string ServiceName = "service_mgr";
 
@@ -81,7 +78,7 @@ namespace FirebirdSql.Data.Services
 
 		internal ServiceParameterBuffer BuildSpb()
 		{
-			ServiceParameterBuffer spb = new ServiceParameterBuffer();
+			var spb = new ServiceParameterBuffer();
 			spb.Append(IscCodes.isc_spb_version);
 			spb.Append(IscCodes.isc_spb_current_version);
 			var gdsSvc = _svc as Client.Managed.Version10.GdsServiceManager;
@@ -115,7 +112,8 @@ namespace FirebirdSql.Data.Services
 				{
 					_svc = ClientFactory.CreateServiceManager(_csManager);
 				}
-				_svc.Attach(BuildSpb(), _csManager.DataSource, _csManager.Port, ServiceName);
+				_svc.Attach(BuildSpb(), _csManager.DataSource, _csManager.Port, ServiceName, _csManager.CryptKey);
+				_svc.WarningMessage = OnWarningMessage;
 				State = FbServiceState.Open;
 			}
 			catch (Exception ex)
@@ -162,8 +160,7 @@ namespace FirebirdSql.Data.Services
 			var result = new List<object>();
 			Query(items, (truncated, item) =>
 			{
-				var stringItem = item as string;
-				if (stringItem != null)
+				if (item is string stringItem)
 				{
 					if (!truncated)
 					{
@@ -177,8 +174,7 @@ namespace FirebirdSql.Data.Services
 					return;
 				}
 
-				var byteArrayItem = item as byte[];
-				if (byteArrayItem != null)
+				if (item is byte[] byteArrayItem)
 				{
 					if (!truncated)
 					{
@@ -339,7 +335,7 @@ namespace FirebirdSql.Data.Services
 
 		private byte[] QueryService(byte[] items)
 		{
-			bool shouldClose = false;
+			var shouldClose = false;
 			if (State == FbServiceState.Closed)
 			{
 				Open();
@@ -351,7 +347,7 @@ namespace FirebirdSql.Data.Services
 			}
 			try
 			{
-				byte[] buffer = new byte[QueryBufferSize];
+				var buffer = new byte[QueryBufferSize];
 				_svc.Query(QuerySpb, items.Length, items, buffer.Length, buffer);
 				return buffer;
 			}
@@ -364,9 +360,14 @@ namespace FirebirdSql.Data.Services
 			}
 		}
 
+		private void OnWarningMessage(IscException warning)
+		{
+			InfoMessage?.Invoke(this, new FbInfoMessageEventArgs(warning));
+		}
+
 		private static FbServerConfig ParseServerConfig(byte[] buffer, ref int pos)
 		{
-			FbServerConfig config = new FbServerConfig();
+			var config = new FbServerConfig();
 
 			pos = 1;
 			while (buffer[pos] != IscCodes.isc_info_flag_end)
@@ -374,7 +375,7 @@ namespace FirebirdSql.Data.Services
 				pos++;
 
 				int key = buffer[pos - 1];
-				int keyValue = IscHelper.VaxInteger(buffer, pos, 4);
+				var keyValue = IscHelper.VaxInteger(buffer, pos, 4);
 
 				pos += 4;
 
@@ -465,9 +466,9 @@ namespace FirebirdSql.Data.Services
 
 		private static FbDatabasesInfo ParseDatabasesInfo(byte[] buffer, ref int pos)
 		{
-			FbDatabasesInfo dbInfo = new FbDatabasesInfo();
-			int type = 0;
-			int length = 0;
+			var dbInfo = new FbDatabasesInfo();
+			var type = 0;
+			var length = 0;
 
 			pos = 1;
 
@@ -500,10 +501,10 @@ namespace FirebirdSql.Data.Services
 
 		private static FbUserData[] ParseUserData(byte[] buffer, ref int pos)
 		{
-			List<FbUserData> users = new List<FbUserData>();
+			var users = new List<FbUserData>();
 			FbUserData currentUser = null;
-			int type = 0;
-			int length = 0;
+			var type = 0;
+			var length = 0;
 
 			while ((type = buffer[pos++]) != IscCodes.isc_info_end)
 			{
