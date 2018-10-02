@@ -21,7 +21,6 @@ using System.Data;
 using System.Data.Common;
 using System.Globalization;
 using System.Text;
-
 using FirebirdSql.Data.Common;
 
 namespace FirebirdSql.Data.FirebirdClient
@@ -553,6 +552,17 @@ namespace FirebirdSql.Data.FirebirdClient
 			}
 		}
 
+#if !NETSTANDARD1_6
+		public override void EnlistTransaction(System.Transactions.Transaction transaction)
+		{
+			if (transaction != null)
+			{
+				if (!_innerConnection.IsEnlisted)
+					_innerConnection.EnlistTransaction(transaction);
+			}
+
+		}
+#endif
 		#endregion
 
 		#region Private Methods
